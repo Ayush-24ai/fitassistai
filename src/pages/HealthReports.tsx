@@ -25,6 +25,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 
 interface LabValue {
   id: string;
@@ -71,6 +73,8 @@ export default function HealthReports() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { isAuthenticated, guestUsage, setGuestUsage } = useAuthStore();
+  const { user } = useAuth();
+  const { saveAnalysis } = useAnalysisHistory();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -238,6 +242,17 @@ export default function HealthReports() {
       }
 
       setResults(data.results || []);
+
+      // Save to analysis history for authenticated users
+      if (user && data.results) {
+        const abnormalCount = data.results.filter((r: { status: string }) => r.status !== 'normal').length;
+        await saveAnalysis(
+          'health-reports',
+          `Lab Report Analysis: ${data.results.length} values`,
+          `${abnormalCount} abnormal values found`,
+          { labValues: validValues, results: data.results }
+        );
+      }
 
       if (!isAuthenticated) {
         setGuestUsage("health-reports");

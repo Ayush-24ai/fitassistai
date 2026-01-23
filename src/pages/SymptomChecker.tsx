@@ -22,6 +22,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 
 interface SymptomResult {
   severity: "emergency" | "urgent" | "moderate" | "mild";
@@ -52,6 +54,8 @@ export default function SymptomChecker() {
   const [showMapSection, setShowMapSection] = useState(false);
   
   const { isAuthenticated, guestUsage, setGuestUsage } = useAuthStore();
+  const { user } = useAuth();
+  const { saveAnalysis } = useAnalysisHistory();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -94,6 +98,16 @@ export default function SymptomChecker() {
       }
 
       setResult(data);
+      
+      // Save to analysis history for authenticated users
+      if (user) {
+        await saveAnalysis(
+          'symptom-checker',
+          `Symptom Analysis: ${data.severity} severity`,
+          `Doctor type: ${data.doctorType}`,
+          { symptoms, ...data }
+        );
+      }
       
       if (!isAuthenticated) {
         setGuestUsage("symptom-checker");
@@ -352,14 +366,14 @@ export default function SymptomChecker() {
                             variant="outline" 
                             onClick={requestLocation}
                             disabled={isLoadingDoctors}
-                            className="w-full"
+                            className="w-full flex-wrap h-auto py-2"
                           >
                             {isLoadingDoctors ? (
-                              <>Finding nearby doctors...</>
+                              <span className="truncate">Finding doctors...</span>
                             ) : (
                               <>
-                                <Locate className="w-4 h-4 mr-2" />
-                                Find Nearby {result.doctorType}s
+                                <Locate className="w-4 h-4 mr-2 flex-shrink-0" />
+                                <span className="truncate">Find Nearby Specialists</span>
                               </>
                             )}
                           </Button>

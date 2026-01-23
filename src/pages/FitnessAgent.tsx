@@ -11,6 +11,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 interface FitnessProfile {
   age: number;
   gender: string;
@@ -39,6 +41,8 @@ export default function FitnessAgent() {
     guestUsage,
     setGuestUsage
   } = useAuthStore();
+  const { user } = useAuth();
+  const { saveAnalysis } = useAnalysisHistory();
   const navigate = useNavigate();
   const {
     toast
@@ -85,6 +89,17 @@ export default function FitnessAgent() {
         throw new Error(data.error);
       }
       setResult(data);
+      
+      // Save to analysis history for authenticated users
+      if (user) {
+        await saveAnalysis(
+          'fitness-agent',
+          `Fitness Plan: ${goal === 'lose' ? 'Lose Weight' : goal === 'gain' ? 'Gain Muscle' : 'Maintain Weight'}`,
+          `BMI: ${data.bmi} (${data.bmiCategory}), Target: ${data.recommendedCalories} cal/day`,
+          { profile, goal, ...data }
+        );
+      }
+      
       if (!isAuthenticated) {
         setGuestUsage("fitness-agent");
       }

@@ -84,10 +84,9 @@ export default function SignUp() {
     }
 
     toast({
-      title: "Welcome to Fitness Assist!",
-      description: "Your account has been created successfully.",
+      title: "Check your email!",
+      description: "We've sent you a verification link. Please verify your email to continue.",
     });
-    navigate("/dashboard");
     setIsLoading(false);
   };
 
