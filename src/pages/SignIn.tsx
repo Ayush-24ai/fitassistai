@@ -1,43 +1,89 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Activity, ArrowLeft, Eye, EyeOff, Mail, Lock } from "lucide-react";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const signInSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
 
 export default function SignIn() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser, setAuthenticated } = useAuthStore();
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const { signIn, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/dashboard");
+    }
+  }, [user, loading, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
+
+    // Validate input
+    const result = signInSchema.safeParse({ email, password });
+    if (!result.success) {
+      const fieldErrors: { email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0] === "email") fieldErrors.email = err.message;
+        if (err.path[0] === "password") fieldErrors.password = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate authentication (will be replaced with real auth)
-    setTimeout(() => {
-      setUser({
-        id: "1",
-        email: email,
-        name: email.split("@")[0],
-      });
-      setAuthenticated(true);
+    const { error } = await signIn(email, password);
+
+    if (error) {
+      let errorMessage = "An error occurred during sign in.";
+      
+      if (error.message.includes("Invalid login credentials")) {
+        errorMessage = "Invalid email or password. Please try again.";
+      } else if (error.message.includes("Email not confirmed")) {
+        errorMessage = "Please verify your email before signing in.";
+      }
+      
       toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
+        title: "Sign in failed",
+        description: errorMessage,
+        variant: "destructive",
       });
-      navigate("/dashboard");
       setIsLoading(false);
-    }, 1000);
+      return;
+    }
+
+    toast({
+      title: "Welcome back!",
+      description: "You have successfully signed in.",
+    });
+    navigate("/dashboard");
+    setIsLoading(false);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center hero-gradient">
+        <div className="animate-pulse text-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center hero-gradient p-4">
@@ -82,6 +128,9 @@ export default function SignIn() {
                   required
                 />
               </div>
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -109,15 +158,9 @@ export default function SignIn() {
                   )}
                 </button>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <Link
-                to="/forgot-password"
-                className="text-sm text-primary hover:underline"
-              >
-                Forgot password?
-              </Link>
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password}</p>
+              )}
             </div>
 
             <Button

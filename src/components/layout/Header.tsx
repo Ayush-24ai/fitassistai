@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Activity } from "lucide-react";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const navLinks = [
   { href: "/#features", label: "Features" },
@@ -14,7 +15,8 @@ const navLinks = [
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { isAuthenticated, user, logout } = useAuthStore();
+  const { user, signOut, loading } = useAuth();
+  const { toast } = useToast();
   const location = useLocation();
 
   const handleNavClick = (href: string) => {
@@ -24,6 +26,25 @@ export function Header() {
       element?.scrollIntoView({ behavior: "smooth" });
     }
   };
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: "Sign out failed",
+        description: "An error occurred while signing out.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully.",
+      });
+    }
+    setMobileMenuOpen(false);
+  };
+
+  const isAuthenticated = !!user;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -59,12 +80,14 @@ export function Header() {
 
         {/* Auth Buttons */}
         <div className="hidden md:flex items-center gap-3">
-          {isAuthenticated ? (
+          {loading ? (
+            <div className="animate-pulse text-sm text-muted-foreground">Loading...</div>
+          ) : isAuthenticated ? (
             <>
               <span className="text-sm text-muted-foreground">
-                {user?.name || user?.email}
+                {user?.user_metadata?.display_name || user?.email?.split('@')[0] || user?.email}
               </span>
-              <Button variant="ghost" size="sm" onClick={logout}>
+              <Button variant="ghost" size="sm" onClick={handleSignOut}>
                 Sign Out
               </Button>
               <Link to="/dashboard">
@@ -125,14 +148,16 @@ export function Header() {
                 </a>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
-                {isAuthenticated ? (
+                {loading ? (
+                  <div className="animate-pulse text-sm text-muted-foreground py-2">Loading...</div>
+                ) : isAuthenticated ? (
                   <>
                     <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
                       <Button variant="hero" className="w-full">
                         Dashboard
                       </Button>
                     </Link>
-                    <Button variant="ghost" className="w-full" onClick={() => { logout(); setMobileMenuOpen(false); }}>
+                    <Button variant="ghost" className="w-full" onClick={handleSignOut}>
                       Sign Out
                     </Button>
                   </>
