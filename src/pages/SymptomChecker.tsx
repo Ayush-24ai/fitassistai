@@ -19,16 +19,19 @@ import {
   Loader2,
   Navigation,
   ExternalLink,
-  Info
+  Info,
+  Crown,
+  Lock
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
 import { useNearbyPlaces } from "@/hooks/useNearbyPlaces";
+import { useProStatus } from "@/hooks/useProStatus";
 import { LeafletMap } from "@/components/maps/LeafletMap";
 
 interface SymptomResult {
@@ -51,8 +54,9 @@ export default function SymptomChecker() {
   
   const { isAuthenticated, guestUsage, setGuestUsage } = useAuthStore();
   const { user } = useAuth();
+  const { isPro } = useProStatus();
   const { saveAnalysis } = useAnalysisHistory();
-  const { places, isLoading: isLoadingPlaces, searchNearbyPlaces, isUsingDemoData } = useNearbyPlaces();
+  const { places, isLoading: isLoadingPlaces, searchNearbyPlaces, clearPlaces } = useNearbyPlaces();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -153,6 +157,16 @@ export default function SymptomChecker() {
   };
 
   const requestLocation = () => {
+    // Check Pro status before searching
+    if (!isPro) {
+      toast({
+        title: "Pro feature",
+        description: "Nearby clinic search is available for Pro users.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLocationError(null);
     setIsLoadingLocation(true);
     
@@ -170,7 +184,7 @@ export default function SymptomChecker() {
         };
         setUserLocation(location);
         
-        // Search for nearby places using OpenStreetMap
+        // Search for real nearby places using OpenStreetMap (Pro only)
         await searchNearbyPlaces(location, result?.doctorType || 'hospital');
         setShowMapSection(true);
         setIsLoadingLocation(false);
@@ -179,42 +193,55 @@ export default function SymptomChecker() {
         console.error("Location error:", error);
         setLocationError("Unable to get your location. Please enable location access.");
         setIsLoadingLocation(false);
-        
-        // Use a default location for demo
-        const demoLocation = { lat: 28.6139, lng: 77.2090 }; // Delhi
-        setUserLocation(demoLocation);
-        searchNearbyPlaces(demoLocation, result?.doctorType || 'hospital');
-        setShowMapSection(true);
+        toast({
+          title: "Location required",
+          description: "Please enable location access to find nearby clinics.",
+          variant: "destructive",
+        });
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const openDirections = (place: { lat: number; lng: number; address: string }) => {
-    // Open in device's default map app
+  const openDirections = (place: { lat: number; lng: number; name: string }) => {
+    // Pro-only feature
+    if (!isPro) {
+      toast({
+        title: "Pro feature",
+        description: "Directions are available for Pro users.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Open in device's default map app using Google Maps URL (works on all platforms)
     const destination = `${place.lat},${place.lng}`;
     const origin = userLocation ? `${userLocation.lat},${userLocation.lng}` : '';
+    const encodedName = encodeURIComponent(place.name);
     
-    // Try to use native maps on mobile
+    // Detect platform
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const isAndroid = /Android/.test(navigator.userAgent);
     
     let mapsUrl: string;
     
     if (isIOS) {
-      mapsUrl = `maps://maps.apple.com/?daddr=${destination}&saddr=${origin}`;
+      // Apple Maps URL scheme with fallback to Google Maps web
+      mapsUrl = `https://maps.apple.com/?daddr=${destination}&dirflg=d`;
     } else if (isAndroid) {
-      mapsUrl = `geo:${destination}?q=${destination}`;
+      // Google Maps intent for Android
+      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}&destination_place_id=${encodedName}&travelmode=driving`;
     } else {
-      // Fallback to OpenStreetMap directions
+      // Desktop - use Google Maps web
       if (origin) {
-        mapsUrl = `https://www.openstreetmap.org/directions?from=${origin}&to=${destination}`;
+        mapsUrl = `https://www.google.com/maps/dir/${origin}/${destination}`;
       } else {
-        mapsUrl = `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=16/${place.lat}/${place.lng}`;
+        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${destination}`;
       }
     }
     
-    window.open(mapsUrl, '_blank');
+    // Open in new tab/window - this bypasses iframe restrictions
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
   const getSeverityColor = (severity: string) => {
@@ -413,14 +440,23 @@ export default function SymptomChecker() {
                           <Phone className="w-4 h-4 mr-2" />
                           Call 911
                         </Button>
-                        <Button variant="outline" size="lg" onClick={requestLocation} disabled={isLoadingLocation}>
-                          {isLoadingLocation ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <MapPin className="w-4 h-4 mr-2" />
-                          )}
-                          Find Nearest ER
-                        </Button>
+                        {isPro ? (
+                          <Button variant="outline" size="lg" onClick={requestLocation} disabled={isLoadingLocation}>
+                            {isLoadingLocation ? (
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            ) : (
+                              <MapPin className="w-4 h-4 mr-2" />
+                            )}
+                            Find Nearest ER
+                          </Button>
+                        ) : (
+                          <Link to="/upgrade">
+                            <Button variant="outline" size="lg">
+                              <Lock className="w-4 h-4 mr-2" />
+                              Find ER (Pro)
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -464,24 +500,46 @@ export default function SymptomChecker() {
                         <p className="text-foreground font-medium">{result.doctorType}</p>
                         
                         {!showMapSection && (
-                          <Button 
-                            variant="outline" 
-                            onClick={requestLocation}
-                            disabled={isLoadingLocation || isLoadingPlaces}
-                            className="w-full flex-wrap h-auto py-2"
-                          >
-                            {isLoadingLocation || isLoadingPlaces ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                <span className="truncate">Finding specialists...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Locate className="w-4 h-4 mr-2 flex-shrink-0" />
-                                <span className="truncate">Find Nearby Specialists</span>
-                              </>
-                            )}
-                          </Button>
+                          isPro ? (
+                            <Button 
+                              variant="outline" 
+                              onClick={requestLocation}
+                              disabled={isLoadingLocation || isLoadingPlaces}
+                              className="w-full flex-wrap h-auto py-2"
+                            >
+                              {isLoadingLocation || isLoadingPlaces ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  <span className="truncate">Finding specialists...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Locate className="w-4 h-4 mr-2 flex-shrink-0" />
+                                  <span className="truncate">Find Nearby Specialists</span>
+                                </>
+                              )}
+                            </Button>
+                          ) : (
+                            <div className="space-y-3">
+                              <div className="p-4 rounded-xl bg-secondary/50 border border-border text-center">
+                                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
+                                  <Lock className="w-5 h-5 text-muted-foreground" />
+                                </div>
+                                <p className="text-sm font-medium text-foreground mb-1">
+                                  Nearby Clinics (Pro Feature)
+                                </p>
+                                <p className="text-xs text-muted-foreground mb-3">
+                                  Find real nearby specialists with directions
+                                </p>
+                                <Link to="/upgrade">
+                                  <Button variant="pro" size="sm" className="w-full">
+                                    <Crown className="w-4 h-4 mr-2" />
+                                    Upgrade to Pro
+                                  </Button>
+                                </Link>
+                              </div>
+                            </div>
+                          )
                         )}
                       </CardContent>
                     </Card>
@@ -547,8 +605,8 @@ export default function SymptomChecker() {
                     </Card>
                   </div>
 
-                  {/* Nearby Doctors Section with OpenStreetMap */}
-                  {showMapSection && places.length > 0 && (
+                  {/* Nearby Doctors Section with OpenStreetMap - Pro Only */}
+                  {showMapSection && isPro && places.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -558,14 +616,15 @@ export default function SymptomChecker() {
                           <CardTitle className="flex items-center gap-2">
                             <MapPin className="w-5 h-5 text-primary" />
                             Nearby {result.doctorType}s
+                            <span className="ml-auto px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium flex items-center gap-1">
+                              <Crown className="w-3 h-3" />
+                              Pro
+                            </span>
                           </CardTitle>
                           <CardDescription>
-                            Found {places.length} facilities within 10km
-                            {isUsingDemoData && (
-                              <span className="text-health-warning ml-2">(Demo data)</span>
-                            )}
-                            {locationError && !isUsingDemoData && (
-                              <span className="text-health-warning ml-2">(Using approximate location)</span>
+                            Found {places.length} real facilities within 10km
+                            {locationError && (
+                              <span className="text-health-warning ml-2">(Location approximate)</span>
                             )}
                           </CardDescription>
                         </CardHeader>
