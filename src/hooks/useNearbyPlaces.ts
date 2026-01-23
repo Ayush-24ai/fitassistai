@@ -6,7 +6,7 @@ interface Location {
   lng: number;
 }
 
-interface NearbyPlace {
+export interface NearbyPlace {
   name: string;
   address: string;
   distance: string;
@@ -16,7 +16,6 @@ interface NearbyPlace {
   lng: number;
   rating?: number;
   isOpen?: boolean;
-  isDemo?: boolean;
 }
 
 // Doctor type to OSM healthcare specialization mapping
@@ -191,40 +190,44 @@ export function useNearbyPlaces() {
       nearbyPlaces = nearbyPlaces.slice(0, 15);
 
       if (nearbyPlaces.length === 0) {
-        // If no real results, show demo data
-        const demoPlaces = generateDemoPlaces(location, doctorType);
-        setPlaces(demoPlaces);
-        setIsUsingDemoData(true);
+        // No results found - return empty array (Pro users only see real data)
+        setPlaces([]);
+        setIsUsingDemoData(false);
         
         toast({
-          title: 'Using sample locations',
-          description: 'No medical facilities found nearby. Showing sample data for demonstration.',
+          title: 'No facilities found',
+          description: 'No medical facilities found within 10km. Try a different location.',
         });
         
-        return demoPlaces;
+        return [];
       }
 
       setPlaces(nearbyPlaces);
+      setIsUsingDemoData(false);
       return nearbyPlaces;
     } catch (err) {
       console.error('Error fetching nearby places:', err);
-      setError('Unable to fetch nearby places. Showing demo data.');
-      setIsUsingDemoData(true);
-      
-      // Return demo data on error
-      const demoPlaces = generateDemoPlaces(location, doctorType);
-      setPlaces(demoPlaces);
+      setError('Unable to fetch nearby places. Please try again.');
+      setIsUsingDemoData(false);
+      setPlaces([]);
       
       toast({
-        title: 'Using sample locations',
-        description: 'Could not connect to map service. Showing sample data for demonstration.',
+        title: 'Connection error',
+        description: 'Could not connect to map service. Please try again.',
+        variant: 'destructive',
       });
       
-      return demoPlaces;
+      return [];
     } finally {
       setIsLoading(false);
     }
   }, [toast]);
+
+  const clearPlaces = useCallback(() => {
+    setPlaces([]);
+    setError(null);
+    setIsUsingDemoData(false);
+  }, []);
 
   return {
     places,
@@ -232,53 +235,6 @@ export function useNearbyPlaces() {
     error,
     isUsingDemoData,
     searchNearbyPlaces,
+    clearPlaces,
   };
-}
-
-// Generate demo places around a location with realistic medical facility names
-function generateDemoPlaces(location: Location, doctorType: string): NearbyPlace[] {
-  const specialtyNames: Record<string, string[]> = {
-    'cardiologist': ['Heart Care Center', 'Cardiology Clinic', 'Cardiac Specialists'],
-    'orthopedic': ['Bone & Joint Center', 'Ortho Care Hospital', 'Sports Medicine Clinic'],
-    'dermatologist': ['Skin Care Clinic', 'Dermatology Center', 'Skin Health Hospital'],
-    'neurologist': ['Brain & Spine Center', 'Neurology Clinic', 'Neuro Care Hospital'],
-    'pediatrician': ['Children\'s Hospital', 'Kids Health Clinic', 'Pediatric Care Center'],
-    'ophthalmologist': ['Eye Care Center', 'Vision Clinic', 'Ophthalmology Hospital'],
-    'ent': ['ENT Specialists', 'Ear Nose Throat Clinic', 'ENT Care Center'],
-    'psychiatrist': ['Mental Health Center', 'Psychiatry Clinic', 'Mind Care Hospital'],
-    'gynecologist': ['Women\'s Health Center', 'Gynecology Clinic', 'Maternity Hospital'],
-    'general physician': ['City Medical Center', 'Family Health Clinic', 'General Hospital'],
-    'hospital': ['City Hospital', 'Medical Center', 'Community Health Clinic', 'Metro Hospital', 'Regional Medical Center'],
-  };
-
-  const normalizedType = doctorType?.toLowerCase().trim() || 'hospital';
-  const names = specialtyNames[normalizedType] || specialtyNames['hospital'];
-
-  // Create 5 demo locations within 10km
-  const demoOffsets = [
-    { lat: 0.008, lng: 0.006, dist: 1.2 },
-    { lat: -0.015, lng: 0.012, dist: 2.4 },
-    { lat: 0.025, lng: -0.010, dist: 3.8 },
-    { lat: -0.035, lng: -0.020, dist: 5.5 },
-    { lat: 0.050, lng: 0.030, dist: 7.2 },
-  ];
-
-  return demoOffsets.map((offset, i) => {
-    const lat = location.lat + offset.lat;
-    const lng = location.lng + offset.lng;
-    const distanceKm = calculateDistance(location.lat, location.lng, lat, lng);
-
-    return {
-      name: `${names[i % names.length]} (Demo)`,
-      address: `Sample Address ${i + 1}, Medical District`,
-      distance: formatDistance(distanceKm),
-      distanceKm,
-      specialty: normalizedType === 'hospital' ? 'General Medicine' : normalizedType,
-      lat,
-      lng,
-      rating: 3.5 + Math.random() * 1.5,
-      isOpen: Math.random() > 0.2,
-      isDemo: true,
-    };
-  }).sort((a, b) => a.distanceKm - b.distanceKm);
 }
