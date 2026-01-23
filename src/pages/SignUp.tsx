@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Activity, ArrowLeft, Eye, EyeOff, Mail, Lock, User } from "lucide-react";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const signUpSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
+  email: z.string().email("Please enter a valid email address").max(255, "Email must be less than 255 characters"),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128, "Password must be less than 128 characters"),
+});
 
 export default function SignUp() {
   const [name, setName] = useState("");
@@ -16,12 +23,21 @@ export default function SignUp() {
   const [showPassword, setShowPassword] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { setUser, setAuthenticated } = useAuthStore();
+  const [errors, setErrors] = useState<{ name?: string; email?: string; password?: string }>({});
+  const { signUp, user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!loading && user) {
+      navigate("/dashboard");
+    }
+  }, [user, loading, navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors({});
     
     if (!agreeToTerms) {
       toast({
@@ -32,24 +48,56 @@ export default function SignUp() {
       return;
     }
 
+    // Validate input
+    const result = signUpSchema.safeParse({ name, email, password });
+    if (!result.success) {
+      const fieldErrors: { name?: string; email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0] === "name") fieldErrors.name = err.message;
+        if (err.path[0] === "email") fieldErrors.email = err.message;
+        if (err.path[0] === "password") fieldErrors.password = err.message;
+      });
+      setErrors(fieldErrors);
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate registration (will be replaced with real auth)
-    setTimeout(() => {
-      setUser({
-        id: "1",
-        email: email,
-        name: name,
-      });
-      setAuthenticated(true);
+    const { error } = await signUp(email, password, name);
+
+    if (error) {
+      let errorMessage = "An error occurred during sign up.";
+      
+      if (error.message.includes("User already registered")) {
+        errorMessage = "An account with this email already exists. Please sign in instead.";
+      } else if (error.message.includes("Password")) {
+        errorMessage = error.message;
+      }
+      
       toast({
-        title: "Welcome to Fitness Assist!",
-        description: "Your account has been created successfully.",
+        title: "Sign up failed",
+        description: errorMessage,
+        variant: "destructive",
       });
-      navigate("/dashboard");
       setIsLoading(false);
-    }, 1000);
+      return;
+    }
+
+    toast({
+      title: "Welcome to Fitness Assist!",
+      description: "Your account has been created successfully.",
+    });
+    navigate("/dashboard");
+    setIsLoading(false);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center hero-gradient">
+        <div className="animate-pulse text-foreground">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center hero-gradient p-4">
@@ -94,6 +142,9 @@ export default function SignUp() {
                   required
                 />
               </div>
+              {errors.name && (
+                <p className="text-sm text-destructive">{errors.name}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -110,6 +161,9 @@ export default function SignUp() {
                   required
                 />
               </div>
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -138,6 +192,9 @@ export default function SignUp() {
                   )}
                 </button>
               </div>
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password}</p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Must be at least 8 characters
               </p>

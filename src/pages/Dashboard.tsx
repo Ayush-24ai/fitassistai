@@ -1,7 +1,8 @@
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   User, 
   Crown, 
@@ -12,8 +13,10 @@ import {
   LogOut,
   ChevronRight
 } from "lucide-react";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuth } from "@/hooks/useAuth";
 import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/stores/authStore";
 
 const quickActions = [
   {
@@ -41,11 +44,46 @@ const quickActions = [
 ];
 
 export default function Dashboard() {
-  const { isAuthenticated, isPro, user, logout } = useAuthStore();
+  const { user, signOut, loading } = useAuth();
+  const { isPro } = useAuthStore();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   // Redirect if not authenticated
-  if (!isAuthenticated) {
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate("/signin");
+    }
+  }, [user, loading, navigate]);
+
+  const handleLogout = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: "Sign out failed",
+        description: "An error occurred while signing out.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully.",
+      });
+      navigate("/");
+    }
+  };
+
+  if (loading) {
+    return (
+      <PageLayout>
+        <div className="container mx-auto px-4 py-20 text-center">
+          <div className="animate-pulse text-foreground">Loading...</div>
+        </div>
+      </PageLayout>
+    );
+  }
+
+  if (!user) {
     return (
       <PageLayout>
         <div className="container mx-auto px-4 py-20 text-center">
@@ -61,10 +99,7 @@ export default function Dashboard() {
     );
   }
 
-  const handleLogout = () => {
-    logout();
-    navigate("/");
-  };
+  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || "User";
 
   return (
     <PageLayout>
@@ -82,9 +117,9 @@ export default function Dashboard() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-foreground">
-                  Welcome, {user?.name || "User"}
+                  Welcome, {displayName}
                 </h1>
-                <p className="text-muted-foreground">{user?.email}</p>
+                <p className="text-muted-foreground">{user.email}</p>
               </div>
             </div>
             {isPro ? (
@@ -146,9 +181,14 @@ export default function Dashboard() {
               <div className="flex items-center justify-between py-3 border-b border-border">
                 <div>
                   <p className="font-medium text-foreground">Email</p>
-                  <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  <p className="text-sm text-muted-foreground">{user.email}</p>
                 </div>
-                <Button variant="ghost" size="sm">Edit</Button>
+              </div>
+              <div className="flex items-center justify-between py-3 border-b border-border">
+                <div>
+                  <p className="font-medium text-foreground">Display Name</p>
+                  <p className="text-sm text-muted-foreground">{displayName}</p>
+                </div>
               </div>
               <div className="flex items-center justify-between py-3 border-b border-border">
                 <div>
