@@ -28,6 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 import { useVoiceInput } from "@/hooks/useVoiceInput";
+import { useNearbyPlaces } from "@/hooks/useNearbyPlaces";
+import { LeafletMap } from "@/components/maps/LeafletMap";
 
 interface SymptomResult {
   severity: "emergency" | "urgent" | "moderate" | "mild";
@@ -38,28 +40,19 @@ interface SymptomResult {
   explanation: string;
 }
 
-interface NearbyDoctor {
-  name: string;
-  address: string;
-  distance: string;
-  specialty: string;
-  rating?: number;
-  isOpen?: boolean;
-}
-
 export default function SymptomChecker() {
   const [symptoms, setSymptoms] = useState("");
   const [result, setResult] = useState<SymptomResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [nearbyDoctors, setNearbyDoctors] = useState<NearbyDoctor[]>([]);
-  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [showMapSection, setShowMapSection] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   
   const { isAuthenticated, guestUsage, setGuestUsage } = useAuthStore();
   const { user } = useAuth();
   const { saveAnalysis } = useAnalysisHistory();
+  const { places, isLoading: isLoadingPlaces, searchNearbyPlaces } = useNearbyPlaces();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -114,7 +107,6 @@ export default function SymptomChecker() {
     }
 
     setIsAnalyzing(true);
-    setNearbyDoctors([]);
     setShowMapSection(false);
     
     try {
@@ -159,84 +151,66 @@ export default function SymptomChecker() {
 
   const requestLocation = () => {
     setLocationError(null);
-    setIsLoadingDoctors(true);
+    setIsLoadingLocation(true);
     
     if (!navigator.geolocation) {
       setLocationError("Geolocation is not supported by your browser");
-      setIsLoadingDoctors(false);
+      setIsLoadingLocation(false);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
         const location = {
           lat: position.coords.latitude,
           lng: position.coords.longitude
         };
         setUserLocation(location);
-        searchNearbyDoctors(location);
+        
+        // Search for nearby places using OpenStreetMap
+        await searchNearbyPlaces(location, result?.doctorType || 'hospital');
+        setShowMapSection(true);
+        setIsLoadingLocation(false);
       },
       (error) => {
         console.error("Location error:", error);
         setLocationError("Unable to get your location. Please enable location access.");
-        setIsLoadingDoctors(false);
-        // Show mock data for demonstration
-        showMockDoctors();
+        setIsLoadingLocation(false);
+        
+        // Use a default location for demo
+        const demoLocation = { lat: 28.6139, lng: 77.2090 }; // Delhi
+        setUserLocation(demoLocation);
+        searchNearbyPlaces(demoLocation, result?.doctorType || 'hospital');
+        setShowMapSection(true);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 
-  const showMockDoctors = () => {
-    // Mock data for demonstration when location is not available
-    const mockDoctors: NearbyDoctor[] = [
-      {
-        name: "City Medical Center",
-        address: "123 Health Street, Medical District",
-        distance: "0.5 km",
-        specialty: result?.doctorType || "General Practice",
-        rating: 4.5,
-        isOpen: true
-      },
-      {
-        name: "Downtown Health Clinic",
-        address: "456 Wellness Avenue",
-        distance: "1.2 km",
-        specialty: result?.doctorType || "General Practice",
-        rating: 4.3,
-        isOpen: true
-      },
-      {
-        name: "Community Hospital",
-        address: "789 Care Boulevard",
-        distance: "2.1 km",
-        specialty: result?.doctorType || "General Practice",
-        rating: 4.7,
-        isOpen: false
+  const openDirections = (place: { lat: number; lng: number; address: string }) => {
+    // Open in device's default map app
+    const destination = `${place.lat},${place.lng}`;
+    const origin = userLocation ? `${userLocation.lat},${userLocation.lng}` : '';
+    
+    // Try to use native maps on mobile
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isAndroid = /Android/.test(navigator.userAgent);
+    
+    let mapsUrl: string;
+    
+    if (isIOS) {
+      mapsUrl = `maps://maps.apple.com/?daddr=${destination}&saddr=${origin}`;
+    } else if (isAndroid) {
+      mapsUrl = `geo:${destination}?q=${destination}`;
+    } else {
+      // Fallback to OpenStreetMap directions
+      if (origin) {
+        mapsUrl = `https://www.openstreetmap.org/directions?from=${origin}&to=${destination}`;
+      } else {
+        mapsUrl = `https://www.openstreetmap.org/?mlat=${place.lat}&mlon=${place.lng}#map=16/${place.lat}/${place.lng}`;
       }
-    ];
+    }
     
-    setNearbyDoctors(mockDoctors);
-    setShowMapSection(true);
-    setIsLoadingDoctors(false);
-  };
-
-  const searchNearbyDoctors = async (location: { lat: number; lng: number }) => {
-    // In production, this would call Google Maps API
-    // For now, show mock data with a note about API integration
-    showMockDoctors();
-    
-    toast({
-      title: "Demo Mode",
-      description: "Showing sample nearby facilities. Google Maps API integration required for real results.",
-    });
-  };
-
-  const openDirections = (address: string) => {
-    const encodedAddress = encodeURIComponent(address);
-    const mapsUrl = userLocation 
-      ? `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${encodedAddress}`
-      : `https://www.google.com/maps/search/${encodedAddress}`;
     window.open(mapsUrl, '_blank');
   };
 
@@ -320,7 +294,7 @@ export default function SymptomChecker() {
                     onClick={isListening ? stopListening : startListening}
                     className={`absolute right-3 top-3 p-2.5 rounded-full transition-all ${
                       isListening 
-                        ? 'bg-health-danger text-white animate-pulse' 
+                        ? 'bg-health-danger text-white' 
                         : 'bg-secondary hover:bg-secondary/80 text-foreground'
                     }`}
                     whileHover={{ scale: 1.05 }}
@@ -436,8 +410,12 @@ export default function SymptomChecker() {
                           <Phone className="w-4 h-4 mr-2" />
                           Call 911
                         </Button>
-                        <Button variant="outline" size="lg" onClick={requestLocation}>
-                          <MapPin className="w-4 h-4 mr-2" />
+                        <Button variant="outline" size="lg" onClick={requestLocation} disabled={isLoadingLocation}>
+                          {isLoadingLocation ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <MapPin className="w-4 h-4 mr-2" />
+                          )}
                           Find Nearest ER
                         </Button>
                       </div>
@@ -486,11 +464,14 @@ export default function SymptomChecker() {
                           <Button 
                             variant="outline" 
                             onClick={requestLocation}
-                            disabled={isLoadingDoctors}
+                            disabled={isLoadingLocation || isLoadingPlaces}
                             className="w-full flex-wrap h-auto py-2"
                           >
-                            {isLoadingDoctors ? (
-                              <span className="truncate">Finding doctors...</span>
+                            {isLoadingLocation || isLoadingPlaces ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                <span className="truncate">Finding specialists...</span>
+                              </>
                             ) : (
                               <>
                                 <Locate className="w-4 h-4 mr-2 flex-shrink-0" />
@@ -563,8 +544,8 @@ export default function SymptomChecker() {
                     </Card>
                   </div>
 
-                  {/* Nearby Doctors Section */}
-                  {showMapSection && nearbyDoctors.length > 0 && (
+                  {/* Nearby Doctors Section with OpenStreetMap */}
+                  {showMapSection && places.length > 0 && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
@@ -576,25 +557,23 @@ export default function SymptomChecker() {
                             Nearby {result.doctorType}s
                           </CardTitle>
                           <CardDescription>
-                            Found {nearbyDoctors.length} facilities near you
+                            Found {places.length} facilities near you
                             {locationError && (
-                              <span className="text-health-warning ml-2">(Using demo data)</span>
+                              <span className="text-health-warning ml-2">(Using approximate location)</span>
                             )}
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
-                          {/* Map Placeholder */}
-                          <div className="w-full h-48 bg-secondary rounded-xl mb-4 flex items-center justify-center border-2 border-dashed border-border">
-                            <div className="text-center text-muted-foreground">
-                              <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                              <p className="text-sm font-medium">Map View</p>
-                              <p className="text-xs">Google Maps API integration ready</p>
-                            </div>
-                          </div>
+                          {/* OpenStreetMap with Leaflet */}
+                          <LeafletMap
+                            userLocation={userLocation}
+                            places={places}
+                            className="mb-4"
+                          />
 
                           {/* Doctor List */}
                           <div className="space-y-3">
-                            {nearbyDoctors.map((doctor, index) => (
+                            {places.map((place, index) => (
                               <div 
                                 key={index} 
                                 className="p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
@@ -603,26 +582,26 @@ export default function SymptomChecker() {
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2">
                                       <h4 className="font-medium text-foreground">
-                                        {doctor.name}
+                                        {place.name}
                                       </h4>
-                                      {doctor.isOpen !== undefined && (
-                                        <span className={`text-xs px-2 py-0.5 rounded-full ${doctor.isOpen ? 'bg-health-success/10 text-health-success' : 'bg-muted text-muted-foreground'}`}>
-                                          {doctor.isOpen ? 'Open' : 'Closed'}
+                                      {place.isOpen !== undefined && (
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${place.isOpen ? 'bg-health-success/10 text-health-success' : 'bg-muted text-muted-foreground'}`}>
+                                          {place.isOpen ? 'Open' : 'Closed'}
                                         </span>
                                       )}
                                     </div>
                                     <p className="text-sm text-muted-foreground mt-1">
-                                      {doctor.address}
+                                      {place.address}
                                     </p>
                                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                       <span className="flex items-center gap-1">
                                         <Navigation className="w-3 h-3" />
-                                        {doctor.distance}
+                                        {place.distance}
                                       </span>
-                                      <span>{doctor.specialty}</span>
-                                      {doctor.rating && (
+                                      <span className="capitalize">{place.specialty}</span>
+                                      {place.rating && (
                                         <span className="text-health-warning">
-                                          ★ {doctor.rating}
+                                          ★ {place.rating.toFixed(1)}
                                         </span>
                                       )}
                                     </div>
@@ -630,7 +609,7 @@ export default function SymptomChecker() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => openDirections(doctor.address)}
+                                    onClick={() => openDirections(place)}
                                     className="flex-shrink-0"
                                   >
                                     <ExternalLink className="w-4 h-4 mr-1" />
@@ -641,12 +620,13 @@ export default function SymptomChecker() {
                             ))}
                           </div>
 
-                          {/* Google Maps API Note */}
-                          <div className="mt-4 p-3 rounded-lg bg-health-blue-light border border-health-blue/30">
+                          {/* OpenStreetMap Attribution */}
+                          <div className="mt-4 p-3 rounded-lg bg-secondary/50 border border-border">
                             <div className="flex items-start gap-2">
-                              <Info className="w-4 h-4 text-health-blue flex-shrink-0 mt-0.5" />
+                              <Info className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                               <p className="text-xs text-muted-foreground">
-                                <strong className="text-foreground">Google Maps Integration Ready:</strong> This feature is prepared for Google Maps Places API integration. Add your API key to enable real-time doctor/hospital search based on your location.
+                                Map data provided by <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">OpenStreetMap</a> contributors. 
+                                Location data is approximate and for guidance only.
                               </p>
                             </div>
                           </div>

@@ -64,7 +64,7 @@
                           radial-gradient(ellipse 60% 40% at 80% 60%, hsl(217 91% 85% / 0.3) 0%, transparent 40%),
                           radial-gradient(ellipse 50% 30% at 20% 80%, hsl(160 84% 85% / 0.3) 0%, transparent 40%);
     --gradient-card: linear-gradient(135deg, hsl(0 0% 100%) 0%, hsl(168 76% 99%) 100%);
-    --gradient-pro: linear-gradient(135deg, hsl(270 80% 60%) 0%, hsl(330 80% 55%) 50%, hsl(15 90% 55%) 100%);
+    --gradient-pro: linear-gradient(135deg, hsl(220 70% 50%) 0%, hsl(200 80% 45%) 50%, hsl(180 70% 40%) 100%);
 
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(215 25% 15% / 0.05);
@@ -72,7 +72,7 @@
     --shadow-lg: 0 10px 15px -3px hsl(215 25% 15% / 0.08), 0 4px 6px -4px hsl(215 25% 15% / 0.05);
     --shadow-xl: 0 20px 25px -5px hsl(215 25% 15% / 0.08), 0 8px 10px -6px hsl(215 25% 15% / 0.05);
     --shadow-glow: 0 0 20px hsl(168 76% 36% / 0.25);
-    --shadow-pro: 0 0 30px hsl(270 80% 60% / 0.4);
+    --shadow-pro: 0 4px 20px hsl(200 70% 50% / 0.25);
 
     /* Sidebar */
     --sidebar-background: 0 0% 98%;
@@ -186,18 +186,16 @@
   }
 
   .pro-gradient {
-    background: var(--gradient-pro);
-    background-size: 200% 200%;
-    animation: shimmer 3s ease-in-out infinite;
+    background: linear-gradient(135deg, hsl(220 70% 50%) 0%, hsl(200 80% 45%) 50%, hsl(180 70% 40%) 100%);
   }
 
   .pro-glow {
-    box-shadow: var(--shadow-pro);
+    box-shadow: 0 4px 20px hsl(200 70% 50% / 0.25);
     transition: box-shadow 0.3s ease;
   }
 
   .pro-glow:hover {
-    box-shadow: 0 0 40px hsl(270 80% 60% / 0.5);
+    box-shadow: 0 6px 30px hsl(200 70% 50% / 0.35);
   }
 
   .glass-card {
@@ -222,12 +220,10 @@
   }
 
   .text-gradient-pro {
-    background: var(--gradient-pro);
-    background-size: 200% 200%;
+    background: linear-gradient(135deg, hsl(220 70% 50%) 0%, hsl(200 80% 45%) 50%, hsl(180 70% 40%) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
-    animation: shimmer 3s ease-in-out infinite;
   }
 
   @keyframes shimmer {
