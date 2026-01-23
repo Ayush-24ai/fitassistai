@@ -15,6 +15,8 @@ interface VerifyOtpRequest {
   displayName?: string;
   // For password reset flow
   newPassword?: string;
+  // If true, just verify OTP without marking as used (for multi-step flows)
+  verifyOnly?: boolean;
 }
 
 serve(async (req: Request) => {
@@ -28,7 +30,7 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { email, otp, purpose, password, displayName, newPassword }: VerifyOtpRequest = await req.json();
+    const { email, otp, purpose, password, displayName, newPassword, verifyOnly }: VerifyOtpRequest = await req.json();
 
     // Validate inputs
     if (!email || !otp || !purpose) {
@@ -110,6 +112,14 @@ serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Invalid OTP. Please try again." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // If verifyOnly is true, just confirm OTP is valid without consuming it
+    if (verifyOnly) {
+      return new Response(
+        JSON.stringify({ success: true, verified: true }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

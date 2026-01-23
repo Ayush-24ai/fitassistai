@@ -109,7 +109,7 @@ export default function SignUp() {
 
     try {
       const { data, error } = await supabase.functions.invoke("verify-otp", {
-        body: { email, otp, purpose: "signup" },
+        body: { email, otp, purpose: "signup", verifyOnly: true },
       });
 
       if (error || data?.error) {
