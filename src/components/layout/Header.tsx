@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Activity } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const navLinks = [
   { href: "/#features", label: "Features" },
@@ -80,6 +81,7 @@ export function Header() {
 
         {/* Auth Buttons */}
         <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle />
           {loading ? (
             <div className="animate-pulse text-sm text-muted-foreground">Loading...</div>
           ) : isAuthenticated ? (
