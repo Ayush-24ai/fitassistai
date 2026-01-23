@@ -5,18 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   User, 
-  Crown, 
   Activity, 
   FileText, 
   Brain,
+  Camera,
   Settings,
   LogOut,
   ChevronRight
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useProStatus } from "@/hooks/useProStatus";
+import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { useAuthStore } from "@/stores/authStore";
+import { ProStatusCard } from "@/components/dashboard/ProStatusCard";
+import { StatsGrid } from "@/components/dashboard/StatsGrid";
+import { AnalysisHistoryCard } from "@/components/dashboard/AnalysisHistoryCard";
 
 const quickActions = [
   {
@@ -24,28 +28,40 @@ const quickActions = [
     title: "Symptom Checker",
     description: "Analyze your symptoms",
     href: "/symptom-checker",
-    color: "health-teal",
+    color: "text-health-teal",
+    bgColor: "bg-health-teal/10",
   },
   {
     icon: FileText,
     title: "Health Reports",
     description: "Analyze lab results",
     href: "/health-reports",
-    color: "health-blue",
+    color: "text-health-blue",
+    bgColor: "bg-health-blue/10",
+  },
+  {
+    icon: Camera,
+    title: "Food Scanner",
+    description: "Scan food for calories",
+    href: "/food-scanner",
+    color: "text-health-emerald",
+    bgColor: "bg-health-emerald/10",
   },
   {
     icon: Brain,
     title: "AI Fitness Agent",
     description: "Get personalized plans",
     href: "/fitness-agent",
-    color: "health-emerald",
+    color: "text-primary",
+    bgColor: "bg-primary/10",
     pro: true,
   },
 ];
 
 export default function Dashboard() {
   const { user, signOut, loading } = useAuth();
-  const { isPro } = useAuthStore();
+  const { isPro } = useProStatus();
+  const { history, loading: historyLoading, deleteAnalysis, getStats } = useAnalysisHistory();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -73,6 +89,16 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeleteAnalysis = async (id: string) => {
+    const success = await deleteAnalysis(id);
+    if (success) {
+      toast({
+        title: "Deleted",
+        description: "Analysis removed from history.",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <PageLayout>
@@ -87,7 +113,7 @@ export default function Dashboard() {
     return (
       <PageLayout>
         <div className="container mx-auto px-4 py-20 text-center">
-          <h1 className="text-2xl font-bold mb-4">Please Sign In</h1>
+          <h1 className="text-2xl font-bold mb-4 text-foreground">Please Sign In</h1>
           <p className="text-muted-foreground mb-6">
             You need to sign in to access your dashboard.
           </p>
@@ -100,6 +126,7 @@ export default function Dashboard() {
   }
 
   const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || "User";
+  const stats = getStats();
 
   return (
     <PageLayout>
@@ -107,72 +134,73 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-4xl mx-auto"
+          className="max-w-5xl mx-auto space-y-8"
         >
           {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <User className="w-8 h-8 text-primary" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
-                  Welcome, {displayName}
-                </h1>
-                <p className="text-muted-foreground">{user.email}</p>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <User className="w-8 h-8 text-primary" />
             </div>
-            {isPro ? (
-              <div className="px-4 py-2 rounded-full pro-gradient text-primary-foreground flex items-center gap-2">
-                <Crown className="w-4 h-4" />
-                Pro Member
-              </div>
-            ) : (
-              <Link to="/upgrade">
-                <Button variant="pro">
-                  <Crown className="w-4 h-4 mr-2" />
-                  Upgrade to Pro
-                </Button>
-              </Link>
-            )}
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">
+                Welcome back, {displayName}
+              </h1>
+              <p className="text-muted-foreground">{user.email}</p>
+            </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {quickActions.map((action) => (
-                <Link key={action.href} to={action.href}>
-                  <Card className="hover:shadow-health-md hover:border-primary/30 transition-all cursor-pointer h-full">
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-xl bg-${action.color}/10 flex items-center justify-center`}>
-                          <action.icon className={`w-6 h-6 text-${action.color}`} />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-foreground">{action.title}</h3>
-                            {action.pro && (
-                              <span className="px-2 py-0.5 rounded-full pro-gradient text-[10px] font-medium text-primary-foreground">
-                                PRO
-                              </span>
-                            )}
+          {/* Pro Status */}
+          <ProStatusCard />
+
+          {/* Stats Grid */}
+          <StatsGrid stats={stats} />
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Quick Actions */}
+            <div>
+              <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
+              <div className="space-y-3">
+                {quickActions.map((action) => (
+                  <Link key={action.href} to={action.href}>
+                    <Card className="hover:shadow-md hover:border-primary/30 transition-all cursor-pointer">
+                      <CardContent className="py-4">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl ${action.bgColor} flex items-center justify-center`}>
+                            <action.icon className={`w-6 h-6 ${action.color}`} />
                           </div>
-                          <p className="text-sm text-muted-foreground">{action.description}</p>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-foreground">{action.title}</h3>
+                              {action.pro && (
+                                <span className="px-2 py-0.5 rounded-full pro-gradient text-[10px] font-medium text-primary-foreground">
+                                  PRO
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground">{action.description}</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
                         </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
             </div>
+
+            {/* Analysis History */}
+            <AnalysisHistoryCard 
+              history={history} 
+              onDelete={handleDeleteAnalysis}
+              loading={historyLoading}
+            />
           </div>
 
           {/* Account Settings */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-foreground">
                 <Settings className="w-5 h-5" />
                 Account Settings
               </CardTitle>
@@ -194,7 +222,7 @@ export default function Dashboard() {
                 <div>
                   <p className="font-medium text-foreground">Subscription</p>
                   <p className="text-sm text-muted-foreground">
-                    {isPro ? "Pro Plan - $3/month" : "Free Plan"}
+                    {isPro ? "Pro Plan - Active" : "Free Plan"}
                   </p>
                 </div>
                 {!isPro && (
@@ -208,7 +236,7 @@ export default function Dashboard() {
                   <p className="font-medium text-foreground">Sign Out</p>
                   <p className="text-sm text-muted-foreground">Sign out of your account</p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-foreground">
                   <LogOut className="w-4 h-4 mr-2" />
                   Sign Out
                 </Button>

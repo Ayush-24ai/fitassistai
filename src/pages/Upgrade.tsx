@@ -7,14 +7,14 @@ import { Label } from "@/components/ui/label";
 import { 
   Crown, 
   Check, 
-  CreditCard, 
   Shield,
   Sparkles,
   ArrowLeft
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/stores/authStore";
+import { useAuth } from "@/hooks/useAuth";
+import { useProStatus } from "@/hooks/useProStatus";
 import { useToast } from "@/hooks/use-toast";
 
 const proFeatures = [
@@ -31,12 +31,13 @@ const proFeatures = [
 export default function Upgrade() {
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const { isAuthenticated, setPro } = useAuthStore();
+  const { user } = useAuth();
+  const { isPro, activatePro } = useProStatus();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleUpgrade = async () => {
-    if (!isAuthenticated) {
+    if (!user) {
       toast({
         title: "Sign in required",
         description: "Please sign in to upgrade to Pro.",
@@ -57,17 +58,61 @@ export default function Upgrade() {
 
     setIsProcessing(true);
 
-    // Simulate payment (will be replaced with Stripe)
-    setTimeout(() => {
-      setPro(true);
+    const success = await activatePro();
+    
+    if (success) {
       toast({
         title: "Welcome to Pro! 🎉",
-        description: "You now have unlimited access to all features.",
+        description: "You now have unlimited access for 1 month.",
       });
       navigate("/dashboard");
-      setIsProcessing(false);
-    }, 2000);
+    } else {
+      toast({
+        title: "Activation failed",
+        description: "Please try again later.",
+        variant: "destructive",
+      });
+    }
+    
+    setIsProcessing(false);
   };
+
+  // If already Pro, show status
+  if (isPro) {
+    return (
+      <PageLayout showMobileNav={false}>
+        <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-lg"
+          >
+            <Card className="border-2 border-primary">
+              <CardHeader className="text-center pb-2">
+                <div className="w-16 h-16 rounded-2xl pro-gradient flex items-center justify-center mx-auto mb-4">
+                  <Crown className="w-8 h-8 text-primary-foreground" />
+                </div>
+                <CardTitle className="text-2xl text-foreground">You're Already Pro!</CardTitle>
+                <CardDescription>
+                  Enjoy unlimited access to all features
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-muted-foreground mb-6">
+                  Thank you for being a Pro member. You have full access to all features.
+                </p>
+                <Link to="/dashboard">
+                  <Button variant="hero" size="lg">
+                    Go to Dashboard
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </PageLayout>
+    );
+  }
 
   return (
     <PageLayout showMobileNav={false}>
@@ -77,12 +122,12 @@ export default function Upgrade() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-lg"
         >
-          <Card className="border-2 border-primary shadow-health-xl">
+          <Card className="border-2 border-primary shadow-lg">
             <CardHeader className="text-center pb-2">
               <div className="w-16 h-16 rounded-2xl pro-gradient flex items-center justify-center mx-auto mb-4">
                 <Crown className="w-8 h-8 text-primary-foreground" />
               </div>
-              <CardTitle className="text-2xl">Upgrade to Pro</CardTitle>
+              <CardTitle className="text-2xl text-foreground">Upgrade to Pro</CardTitle>
               <CardDescription>
                 Unlock your full health & fitness potential
               </CardDescription>
@@ -116,7 +161,7 @@ export default function Upgrade() {
               </div>
 
               {/* Terms Agreement */}
-              <div className="flex items-start gap-2 mb-6 p-4 rounded-lg bg-secondary/50">
+              <div className="flex items-start gap-2 mb-6 p-4 rounded-lg bg-secondary">
                 <Checkbox
                   id="agree"
                   checked={agreeToTerms}

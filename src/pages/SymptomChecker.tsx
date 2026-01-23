@@ -284,7 +284,7 @@ export default function SymptomChecker() {
             >
               {/* Severity Alert */}
               {result.severity === "emergency" && (
-                <div className="p-6 rounded-2xl bg-health-danger-light border-2 border-health-danger">
+                <div className="p-6 rounded-2xl bg-health-danger-light dark:bg-health-danger/10 border-2 border-health-danger">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-xl bg-health-danger flex items-center justify-center flex-shrink-0">
                       <ShieldAlert className="w-6 h-6 text-primary-foreground" />

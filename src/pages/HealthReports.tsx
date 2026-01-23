@@ -404,7 +404,7 @@ export default function HealthReports() {
                       </div>
 
                       {/* Verification Warning */}
-                      <div className="p-3 rounded-lg bg-health-warning-light border border-health-warning/30">
+                      <div className="p-3 rounded-lg bg-health-warning-light dark:bg-health-warning/10 border border-health-warning/30">
                         <div className="flex items-start gap-2">
                           <AlertTriangle className="w-4 h-4 text-health-warning flex-shrink-0 mt-0.5" />
                           <p className="text-xs text-muted-foreground">
@@ -543,11 +543,11 @@ export default function HealthReports() {
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="p-4 rounded-lg bg-health-success-light">
+                      <div className="p-4 rounded-lg bg-health-success-light dark:bg-health-success/10">
                         <h4 className="font-medium text-foreground mb-1">Diet Guidance</h4>
                         <p className="text-sm text-muted-foreground">{result.dietGuidance}</p>
                       </div>
-                      <div className="p-4 rounded-lg bg-health-blue-light">
+                      <div className="p-4 rounded-lg bg-health-blue-light dark:bg-health-blue/10">
                         <h4 className="font-medium text-foreground mb-1">Activity Guidance</h4>
                         <p className="text-sm text-muted-foreground">{result.activityGuidance}</p>
                       </div>

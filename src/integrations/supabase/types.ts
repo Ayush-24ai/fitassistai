@@ -14,12 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_history: {
+        Row: {
+          created_at: string
+          feature_type: string
+          id: string
+          result_data: Json | null
+          summary: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_type: string
+          id?: string
+          result_data?: Json | null
+          summary?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_type?: string
+          id?: string
+          result_data?: Json | null
+          summary?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
           created_at: string
           display_name: string | null
           id: string
+          is_pro: boolean
+          pro_expires_at: string | null
           updated_at: string
           user_id: string
         }
@@ -28,6 +60,8 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_pro?: boolean
+          pro_expires_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -36,6 +70,8 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          is_pro?: boolean
+          pro_expires_at?: string | null
           updated_at?: string
           user_id?: string
         }
