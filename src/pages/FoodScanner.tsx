@@ -254,7 +254,7 @@ export default function FoodScanner() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-center p-6 bg-health-teal-light rounded-xl mb-6">
+                  <div className="flex items-center justify-center p-6 bg-health-teal-light dark:bg-health-teal/10 rounded-xl mb-6">
                     <Flame className="w-8 h-8 text-health-teal mr-3" />
                     <div className="text-center">
                       <div className="text-4xl font-bold text-foreground">
@@ -271,15 +271,15 @@ export default function FoodScanner() {
 
                   {/* Macros */}
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="text-center p-4 rounded-lg bg-health-teal-light">
+                    <div className="text-center p-4 rounded-lg bg-health-teal-light dark:bg-health-teal/10">
                       <div className="text-2xl font-bold text-foreground">{result.macros.protein}g</div>
                       <div className="text-sm text-muted-foreground">Protein</div>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-health-blue-light">
+                    <div className="text-center p-4 rounded-lg bg-health-blue-light dark:bg-health-blue/10">
                       <div className="text-2xl font-bold text-foreground">{result.macros.carbs}g</div>
                       <div className="text-sm text-muted-foreground">Carbs</div>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-health-warning-light">
+                    <div className="text-center p-4 rounded-lg bg-health-warning-light dark:bg-health-warning/10">
                       <div className="text-2xl font-bold text-foreground">{result.macros.fat}g</div>
                       <div className="text-sm text-muted-foreground">Fat</div>
                     </div>
@@ -310,7 +310,7 @@ export default function FoodScanner() {
               )}
 
               {/* Disclaimer */}
-              <div className="p-4 rounded-xl bg-health-warning-light border border-health-warning/30">
+              <div className="p-4 rounded-xl bg-health-warning-light dark:bg-health-warning/10 border border-health-warning/30">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-health-warning flex-shrink-0 mt-0.5" />
                   <div>
