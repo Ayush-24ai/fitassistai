@@ -16,6 +16,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
 
 interface FoodAnalysis {
   foodName: string;
@@ -40,6 +42,8 @@ export default function FoodScanner() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { isAuthenticated, guestUsage, setGuestUsage } = useAuthStore();
+  const { user } = useAuth();
+  const { saveAnalysis } = useAnalysisHistory();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -111,6 +115,16 @@ export default function FoodScanner() {
       }
 
       setResult(data);
+
+      // Save to analysis history for authenticated users
+      if (user) {
+        await saveAnalysis(
+          'food-scanner',
+          `Food Scan: ${data.foodName}`,
+          `${data.calories} calories (${data.confidence} confidence)`,
+          data
+        );
+      }
 
       if (!isAuthenticated) {
         setGuestUsage("food-scanner");
