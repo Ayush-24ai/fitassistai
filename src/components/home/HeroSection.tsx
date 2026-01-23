@@ -37,8 +37,9 @@ export function HeroSection() {
         }} transition={{
           duration: 0.6,
           delay: 0.1
-        }} className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
-            <span className="text-primary">Fitness Assist</span> —{" "}
+        }} className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight">
+            <span className="text-primary">Fitness Assist</span>
+            <span className="text-primary"> — </span>
             <span className="text-primary">
               Your Personal AI Health & Fitness Platform
             </span>
