@@ -10,6 +10,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isPro: boolean;
   proExpiresAt: string | null;
+  proLastSynced: number | null; // Timestamp of last server sync
   user: {
     id: string;
     email: string;
@@ -18,10 +19,12 @@ interface AuthState {
   guestUsage: GuestUsage;
   setAuthenticated: (value: boolean) => void;
   setPro: (value: boolean, expiresAt?: string | null) => void;
+  markProSynced: () => void;
   setUser: (user: AuthState['user']) => void;
   setGuestUsage: (feature: string) => void;
   resetGuestUsage: () => void;
   logout: () => void;
+  clearProStatus: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -30,13 +33,19 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isPro: false,
       proExpiresAt: null,
+      proLastSynced: null,
       user: null,
       guestUsage: {
         hasUsedFeature: false,
         featureUsed: null,
       },
       setAuthenticated: (value) => set({ isAuthenticated: value }),
-      setPro: (value, expiresAt = null) => set({ isPro: value, proExpiresAt: expiresAt }),
+      setPro: (value, expiresAt = null) => set({ 
+        isPro: value, 
+        proExpiresAt: expiresAt,
+        proLastSynced: Date.now()
+      }),
+      markProSynced: () => set({ proLastSynced: Date.now() }),
       setUser: (user) => set({ user, isAuthenticated: !!user }),
       setGuestUsage: (feature) => set({ 
         guestUsage: { hasUsedFeature: true, featureUsed: feature } 
@@ -46,16 +55,23 @@ export const useAuthStore = create<AuthState>()(
       }),
       logout: () => set({ 
         isAuthenticated: false, 
-        // Keep isPro and proExpiresAt on logout - will be verified on next login
+        // Clear Pro status on logout - will be re-fetched from server on next login
+        isPro: false,
+        proExpiresAt: null,
+        proLastSynced: null,
         user: null,
         guestUsage: { hasUsedFeature: false, featureUsed: null }
+      }),
+      clearProStatus: () => set({
+        isPro: false,
+        proExpiresAt: null,
+        proLastSynced: null
       }),
     }),
     {
       name: 'fitness-assist-auth',
       partialize: (state) => ({
-        isPro: state.isPro,
-        proExpiresAt: state.proExpiresAt,
+        // Only persist guest usage - Pro status should always come from server
         guestUsage: state.guestUsage,
       }),
     }
