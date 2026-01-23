@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,10 +13,13 @@ import {
   Phone,
   MapPin,
   ShieldAlert,
-  Info,
+  Locate,
+  Mic,
+  MicOff,
+  Loader2,
   Navigation,
   ExternalLink,
-  Locate
+  Info
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useAnalysisHistory } from "@/hooks/useAnalysisHistory";
+import { useVoiceInput } from "@/hooks/useVoiceInput";
 
 interface SymptomResult {
   severity: "emergency" | "urgent" | "moderate" | "mild";
@@ -58,6 +62,35 @@ export default function SymptomChecker() {
   const { saveAnalysis } = useAnalysisHistory();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Voice input hook
+  const { 
+    isListening, 
+    isSupported: voiceSupported, 
+    transcript, 
+    startListening, 
+    stopListening, 
+    error: voiceError 
+  } = useVoiceInput({
+    onResult: (text) => {
+      setSymptoms(prev => prev ? `${prev} ${text}` : text);
+    },
+    onError: (error) => {
+      toast({
+        title: "Voice input error",
+        description: error,
+        variant: "destructive",
+      });
+    },
+    continuous: true,
+  });
+
+  // Update symptoms with interim transcript while listening
+  useEffect(() => {
+    if (isListening && transcript) {
+      // Show interim results while speaking
+    }
+  }, [isListening, transcript]);
 
   const handleAnalyze = async () => {
     if (!symptoms.trim()) {
@@ -256,36 +289,124 @@ export default function SymptomChecker() {
           </div>
 
           {/* Input Section */}
-          <Card className="mb-8">
+          <Card className="mb-8 card-interactive">
             <CardHeader>
-              <CardTitle>Describe Your Symptoms</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Describe Your Symptoms
+                {voiceSupported && (
+                  <span className="text-xs font-normal text-muted-foreground bg-secondary px-2 py-1 rounded-full">
+                    Voice enabled
+                  </span>
+                )}
+              </CardTitle>
               <CardDescription>
                 Be as specific as possible. Include duration, severity, and any related symptoms.
+                {voiceSupported && " You can also use voice input."}
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Example: I've had a persistent headache for 3 days, along with mild fever and fatigue. The headache is mostly on the right side and gets worse in the evening..."
-                value={symptoms}
-                onChange={(e) => setSymptoms(e.target.value)}
-                className="min-h-[150px] mb-4"
-              />
-              <Button
-                variant="hero"
-                size="lg"
-                onClick={handleAnalyze}
-                disabled={isAnalyzing}
-                className="w-full sm:w-auto"
-              >
-                {isAnalyzing ? (
-                  <>Analyzing with AI...</>
-                ) : (
-                  <>
-                    Analyze Symptoms
-                    <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
+            <CardContent className="space-y-4">
+              <div className="relative">
+                <Textarea
+                  placeholder="Example: I've had a persistent headache for 3 days, along with mild fever and fatigue. The headache is mostly on the right side and gets worse in the evening..."
+                  value={symptoms}
+                  onChange={(e) => setSymptoms(e.target.value)}
+                  className="min-h-[150px] pr-12 resize-none focus-ring"
+                />
+                
+                {/* Voice Input Button */}
+                {voiceSupported && (
+                  <motion.button
+                    type="button"
+                    onClick={isListening ? stopListening : startListening}
+                    className={`absolute right-3 top-3 p-2.5 rounded-full transition-all ${
+                      isListening 
+                        ? 'bg-health-danger text-white animate-pulse' 
+                        : 'bg-secondary hover:bg-secondary/80 text-foreground'
+                    }`}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    title={isListening ? "Stop recording" : "Start voice input"}
+                  >
+                    <AnimatePresence mode="wait">
+                      {isListening ? (
+                        <motion.div
+                          key="mic-off"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          exit={{ scale: 0 }}
+                        >
+                          <MicOff className="w-5 h-5" />
+                        </motion.div>
+                      ) : (
+                        <motion.div
+                          key="mic"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          exit={{ scale: 0 }}
+                        >
+                          <Mic className="w-5 h-5" />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.button>
                 )}
-              </Button>
+              </div>
+
+              {/* Listening indicator */}
+              <AnimatePresence>
+                {isListening && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="flex items-center gap-2 text-sm text-health-danger"
+                  >
+                    <span className="relative flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-health-danger opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-health-danger"></span>
+                    </span>
+                    Listening... Speak your symptoms clearly
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Voice error message */}
+              {voiceError && (
+                <p className="text-sm text-health-danger">{voiceError}</p>
+              )}
+
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="hero"
+                  size="lg"
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing || isListening}
+                  className="flex-1 sm:flex-none"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      Analyze Symptoms
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+                
+                {symptoms && (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    onClick={() => setSymptoms("")}
+                    disabled={isAnalyzing}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
 

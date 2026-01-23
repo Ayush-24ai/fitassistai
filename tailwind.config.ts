@@ -79,6 +79,7 @@ export default {
       },
       fontFamily: {
         sans: [
+          "Plus Jakarta Sans",
           "Inter",
           "-apple-system",
           "BlinkMacSystemFont",
@@ -86,6 +87,17 @@ export default {
           "Roboto",
           "Oxygen",
           "Ubuntu",
+          "sans-serif",
+        ],
+        display: [
+          "Plus Jakarta Sans",
+          "Inter",
+          "sans-serif",
+        ],
+        body: [
+          "Inter",
+          "Plus Jakarta Sans",
+          "-apple-system",
           "sans-serif",
         ],
       },
