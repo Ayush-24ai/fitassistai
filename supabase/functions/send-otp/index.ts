@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.91.0";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,9 +23,11 @@ serve(async (req: Request) => {
   }
 
   try {
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY not configured");
+    const gmailUser = Deno.env.get("GMAIL_USER");
+    const gmailAppPassword = Deno.env.get("GMAIL_APP_PASSWORD");
+    
+    if (!gmailUser || !gmailAppPassword) {
+      console.error("Gmail SMTP credentials not configured");
       return new Response(
         JSON.stringify({ error: "Email service not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -126,7 +129,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Send OTP email using Resend API directly via fetch
+    // Send OTP email using Gmail SMTP
     const subject = purpose === "signup" 
       ? "Verify your email - Fitness Assist" 
       : "Reset your password - Fitness Assist";
@@ -160,23 +163,32 @@ serve(async (req: Request) => {
       </div>
     `;
 
-    const emailResponse = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "Fitness Assist <onboarding@resend.dev>",
-        to: [email],
-        subject,
-        html: htmlContent,
-      }),
-    });
+    try {
+      const client = new SMTPClient({
+        connection: {
+          hostname: "smtp.gmail.com",
+          port: 465,
+          tls: true,
+          auth: {
+            username: gmailUser,
+            password: gmailAppPassword,
+          },
+        },
+      });
 
-    if (!emailResponse.ok) {
-      const errorData = await emailResponse.text();
-      console.error("Email send error:", errorData);
+      await client.send({
+        from: `Fitness Assist <${gmailUser}>`,
+        to: email,
+        subject,
+        content: "Please view this email in an HTML-compatible email client.",
+        html: htmlContent,
+      });
+
+      await client.close();
+      
+      console.log(`OTP sent successfully to ${email} for ${purpose}`);
+    } catch (emailError) {
+      console.error("Email send error:", emailError);
       // Delete the OTP since email failed
       await supabase
         .from("otp_tokens")
@@ -189,8 +201,6 @@ serve(async (req: Request) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    console.log(`OTP sent successfully to ${email} for ${purpose}`);
 
     return new Response(
       JSON.stringify({ success: true, message: "OTP sent successfully" }),
