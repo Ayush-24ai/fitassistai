@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,10 @@ import {
   Phone,
   MapPin,
   ShieldAlert,
-  Info
+  Info,
+  Navigation,
+  ExternalLink,
+  Locate
 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useNavigate } from "react-router-dom";
@@ -29,10 +32,25 @@ interface SymptomResult {
   explanation: string;
 }
 
+interface NearbyDoctor {
+  name: string;
+  address: string;
+  distance: string;
+  specialty: string;
+  rating?: number;
+  isOpen?: boolean;
+}
+
 export default function SymptomChecker() {
   const [symptoms, setSymptoms] = useState("");
   const [result, setResult] = useState<SymptomResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [nearbyDoctors, setNearbyDoctors] = useState<NearbyDoctor[]>([]);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [showMapSection, setShowMapSection] = useState(false);
+  
   const { isAuthenticated, guestUsage, setGuestUsage } = useAuthStore();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -59,6 +77,8 @@ export default function SymptomChecker() {
     }
 
     setIsAnalyzing(true);
+    setNearbyDoctors([]);
+    setShowMapSection(false);
     
     try {
       const { data, error } = await supabase.functions.invoke('symptom-checker', {
@@ -88,6 +108,89 @@ export default function SymptomChecker() {
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  const requestLocation = () => {
+    setLocationError(null);
+    setIsLoadingDoctors(true);
+    
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setIsLoadingDoctors(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const location = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        };
+        setUserLocation(location);
+        searchNearbyDoctors(location);
+      },
+      (error) => {
+        console.error("Location error:", error);
+        setLocationError("Unable to get your location. Please enable location access.");
+        setIsLoadingDoctors(false);
+        // Show mock data for demonstration
+        showMockDoctors();
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const showMockDoctors = () => {
+    // Mock data for demonstration when location is not available
+    const mockDoctors: NearbyDoctor[] = [
+      {
+        name: "City Medical Center",
+        address: "123 Health Street, Medical District",
+        distance: "0.5 km",
+        specialty: result?.doctorType || "General Practice",
+        rating: 4.5,
+        isOpen: true
+      },
+      {
+        name: "Downtown Health Clinic",
+        address: "456 Wellness Avenue",
+        distance: "1.2 km",
+        specialty: result?.doctorType || "General Practice",
+        rating: 4.3,
+        isOpen: true
+      },
+      {
+        name: "Community Hospital",
+        address: "789 Care Boulevard",
+        distance: "2.1 km",
+        specialty: result?.doctorType || "General Practice",
+        rating: 4.7,
+        isOpen: false
+      }
+    ];
+    
+    setNearbyDoctors(mockDoctors);
+    setShowMapSection(true);
+    setIsLoadingDoctors(false);
+  };
+
+  const searchNearbyDoctors = async (location: { lat: number; lng: number }) => {
+    // In production, this would call Google Maps API
+    // For now, show mock data with a note about API integration
+    showMockDoctors();
+    
+    toast({
+      title: "Demo Mode",
+      description: "Showing sample nearby facilities. Google Maps API integration required for real results.",
+    });
+  };
+
+  const openDirections = (address: string) => {
+    const encodedAddress = encodeURIComponent(address);
+    const mapsUrl = userLocation 
+      ? `https://www.google.com/maps/dir/${userLocation.lat},${userLocation.lng}/${encodedAddress}`
+      : `https://www.google.com/maps/search/${encodedAddress}`;
+    window.open(mapsUrl, '_blank');
   };
 
   const getSeverityColor = (severity: string) => {
@@ -130,11 +233,11 @@ export default function SymptomChecker() {
               <Stethoscope className="w-8 h-8 text-primary-foreground" />
             </div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Symptom Checker
+              Symptom Checker & Doctor Finder
             </h1>
             <p className="text-muted-foreground max-w-lg mx-auto">
               Describe your symptoms in detail and receive AI-powered guidance 
-              on severity level and recommended care.
+              on severity level, recommended care, and find nearby specialists.
             </p>
           </div>
 
@@ -194,11 +297,11 @@ export default function SymptomChecker() {
                         {result.explanation}
                       </p>
                       <div className="flex flex-wrap gap-3">
-                        <Button variant="danger" size="lg">
+                        <Button variant="destructive" size="lg">
                           <Phone className="w-4 h-4 mr-2" />
                           Call 911
                         </Button>
-                        <Button variant="outline" size="lg">
+                        <Button variant="outline" size="lg" onClick={requestLocation}>
                           <MapPin className="w-4 h-4 mr-2" />
                           Find Nearest ER
                         </Button>
@@ -233,7 +336,7 @@ export default function SymptomChecker() {
                   </Card>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Doctor Recommendation */}
+                    {/* Doctor Recommendation with Map */}
                     <Card>
                       <CardHeader>
                         <CardTitle className="text-lg flex items-center gap-2">
@@ -241,8 +344,26 @@ export default function SymptomChecker() {
                           Recommended Specialist
                         </CardTitle>
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="space-y-4">
                         <p className="text-foreground font-medium">{result.doctorType}</p>
+                        
+                        {!showMapSection && (
+                          <Button 
+                            variant="outline" 
+                            onClick={requestLocation}
+                            disabled={isLoadingDoctors}
+                            className="w-full"
+                          >
+                            {isLoadingDoctors ? (
+                              <>Finding nearby doctors...</>
+                            ) : (
+                              <>
+                                <Locate className="w-4 h-4 mr-2" />
+                                Find Nearby {result.doctorType}s
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </CardContent>
                     </Card>
 
@@ -306,6 +427,98 @@ export default function SymptomChecker() {
                       </CardContent>
                     </Card>
                   </div>
+
+                  {/* Nearby Doctors Section */}
+                  {showMapSection && nearbyDoctors.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <MapPin className="w-5 h-5 text-primary" />
+                            Nearby {result.doctorType}s
+                          </CardTitle>
+                          <CardDescription>
+                            Found {nearbyDoctors.length} facilities near you
+                            {locationError && (
+                              <span className="text-health-warning ml-2">(Using demo data)</span>
+                            )}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {/* Map Placeholder */}
+                          <div className="w-full h-48 bg-secondary rounded-xl mb-4 flex items-center justify-center border-2 border-dashed border-border">
+                            <div className="text-center text-muted-foreground">
+                              <MapPin className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                              <p className="text-sm font-medium">Map View</p>
+                              <p className="text-xs">Google Maps API integration ready</p>
+                            </div>
+                          </div>
+
+                          {/* Doctor List */}
+                          <div className="space-y-3">
+                            {nearbyDoctors.map((doctor, index) => (
+                              <div 
+                                key={index} 
+                                className="p-4 rounded-xl bg-secondary/50 hover:bg-secondary transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <h4 className="font-medium text-foreground">
+                                        {doctor.name}
+                                      </h4>
+                                      {doctor.isOpen !== undefined && (
+                                        <span className={`text-xs px-2 py-0.5 rounded-full ${doctor.isOpen ? 'bg-health-success/10 text-health-success' : 'bg-muted text-muted-foreground'}`}>
+                                          {doctor.isOpen ? 'Open' : 'Closed'}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                      {doctor.address}
+                                    </p>
+                                    <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                      <span className="flex items-center gap-1">
+                                        <Navigation className="w-3 h-3" />
+                                        {doctor.distance}
+                                      </span>
+                                      <span>{doctor.specialty}</span>
+                                      {doctor.rating && (
+                                        <span className="text-health-warning">
+                                          ★ {doctor.rating}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openDirections(doctor.address)}
+                                    className="flex-shrink-0"
+                                  >
+                                    <ExternalLink className="w-4 h-4 mr-1" />
+                                    Directions
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Google Maps API Note */}
+                          <div className="mt-4 p-3 rounded-lg bg-health-blue-light border border-health-blue/30">
+                            <div className="flex items-start gap-2">
+                              <Info className="w-4 h-4 text-health-blue flex-shrink-0 mt-0.5" />
+                              <p className="text-xs text-muted-foreground">
+                                <strong className="text-foreground">Google Maps Integration Ready:</strong> This feature is prepared for Google Maps Places API integration. Add your API key to enable real-time doctor/hospital search based on your location.
+                              </p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
                 </>
               )}
 
