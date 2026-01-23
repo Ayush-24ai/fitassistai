@@ -39,7 +39,7 @@ export function HeroSection() {
           delay: 0.1
         }} className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
             <span className="text-primary">Fitness Assist</span> —{" "}
-            <span className="text-gradient-health">
+            <span className="text-primary">
               Your Personal AI Health & Fitness Platform
             </span>
           </motion.h1>
