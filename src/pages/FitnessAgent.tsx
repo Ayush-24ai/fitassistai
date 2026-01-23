@@ -6,26 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Brain, 
-  ArrowRight, 
-  Target,
-  Dumbbell,
-  Utensils,
-  Calculator,
-  Crown,
-  Lock,
-  Info,
-  TrendingUp,
-  Activity,
-  Calendar,
-  Lightbulb
-} from "lucide-react";
+import { Brain, ArrowRight, Target, Dumbbell, Utensils, Calculator, Crown, Lock, Info, TrendingUp, Activity, Calendar, Lightbulb } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useNavigate, Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-
 interface FitnessProfile {
   age: number;
   gender: string;
@@ -33,7 +18,6 @@ interface FitnessProfile {
   weight: number;
   activityLevel: string;
 }
-
 interface FitnessResult {
   bmi: number;
   bmiCategory: string;
@@ -48,23 +32,27 @@ interface FitnessResult {
   weeklySchedule?: Record<string, string>;
   tips?: string[];
 }
-
 export default function FitnessAgent() {
-  const { isAuthenticated, isPro, guestUsage, setGuestUsage } = useAuthStore();
+  const {
+    isAuthenticated,
+    isPro,
+    guestUsage,
+    setGuestUsage
+  } = useAuthStore();
   const navigate = useNavigate();
-  const { toast } = useToast();
-
+  const {
+    toast
+  } = useToast();
   const [profile, setProfile] = useState<FitnessProfile>({
     age: 30,
     gender: "male",
     height: 170,
     weight: 70,
-    activityLevel: "moderate",
+    activityLevel: "moderate"
   });
   const [goal, setGoal] = useState("maintain");
   const [result, setResult] = useState<FitnessResult | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
-
   const handleCalculate = async () => {
     // Check if Pro for full features
     if (!isPro && !isAuthenticated) {
@@ -73,30 +61,30 @@ export default function FitnessAgent() {
         toast({
           title: "Sign in required",
           description: "You've used your free trial. Please sign in to continue.",
-          variant: "destructive",
+          variant: "destructive"
         });
         navigate("/signup");
         return;
       }
     }
-
     setIsCalculating(true);
-
     try {
-      const { data, error } = await supabase.functions.invoke('fitness-agent', {
-        body: { ...profile, goal }
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('fitness-agent', {
+        body: {
+          ...profile,
+          goal
+        }
       });
-
       if (error) {
         throw error;
       }
-
       if (data.error) {
         throw new Error(data.error);
       }
-
       setResult(data);
-
       if (!isAuthenticated) {
         setGuestUsage("fitness-agent");
       }
@@ -105,21 +93,21 @@ export default function FitnessAgent() {
       toast({
         title: "Generation failed",
         description: error instanceof Error ? error.message : "Please try again later.",
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsCalculating(false);
     }
   };
-
-  return (
-    <PageLayout>
+  return <PageLayout>
       <div className="container mx-auto px-4 py-12 pb-24 md:pb-12">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-4xl mx-auto"
-        >
+        <motion.div initial={{
+        opacity: 0,
+        y: 20
+      }} animate={{
+        opacity: 1,
+        y: 0
+      }} className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl pro-gradient flex items-center justify-center mx-auto mb-4">
@@ -151,19 +139,17 @@ export default function FitnessAgent() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="age">Age</Label>
-                  <Input
-                    id="age"
-                    type="number"
-                    value={profile.age}
-                    onChange={(e) => setProfile({ ...profile, age: parseInt(e.target.value) || 0 })}
-                  />
+                  <Input id="age" type="number" value={profile.age} onChange={e => setProfile({
+                  ...profile,
+                  age: parseInt(e.target.value) || 0
+                })} />
                 </div>
                 <div>
                   <Label htmlFor="gender">Gender</Label>
-                  <Select
-                    value={profile.gender}
-                    onValueChange={(value) => setProfile({ ...profile, gender: value })}
-                  >
+                  <Select value={profile.gender} onValueChange={value => setProfile({
+                  ...profile,
+                  gender: value
+                })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -175,28 +161,24 @@ export default function FitnessAgent() {
                 </div>
                 <div>
                   <Label htmlFor="height">Height (cm)</Label>
-                  <Input
-                    id="height"
-                    type="number"
-                    value={profile.height}
-                    onChange={(e) => setProfile({ ...profile, height: parseInt(e.target.value) || 0 })}
-                  />
+                  <Input id="height" type="number" value={profile.height} onChange={e => setProfile({
+                  ...profile,
+                  height: parseInt(e.target.value) || 0
+                })} />
                 </div>
                 <div>
                   <Label htmlFor="weight">Weight (kg)</Label>
-                  <Input
-                    id="weight"
-                    type="number"
-                    value={profile.weight}
-                    onChange={(e) => setProfile({ ...profile, weight: parseInt(e.target.value) || 0 })}
-                  />
+                  <Input id="weight" type="number" value={profile.weight} onChange={e => setProfile({
+                  ...profile,
+                  weight: parseInt(e.target.value) || 0
+                })} />
                 </div>
                 <div>
                   <Label htmlFor="activity">Activity Level</Label>
-                  <Select
-                    value={profile.activityLevel}
-                    onValueChange={(value) => setProfile({ ...profile, activityLevel: value })}
-                  >
+                  <Select value={profile.activityLevel} onValueChange={value => setProfile({
+                  ...profile,
+                  activityLevel: value
+                })}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -224,33 +206,24 @@ export default function FitnessAgent() {
                 </div>
               </div>
 
-              <Button
-                variant="pro"
-                size="lg"
-                onClick={handleCalculate}
-                disabled={isCalculating}
-                className="mt-6"
-              >
-                {isCalculating ? (
-                  <>Generating with AI...</>
-                ) : (
-                  <>
+              <Button variant="pro" size="lg" onClick={handleCalculate} disabled={isCalculating} className="mt-6">
+                {isCalculating ? <>Generating with AI...</> : <>
                     <Brain className="w-4 h-4 mr-2" />
                     Generate My Plan
                     <ArrowRight className="w-4 h-4 ml-2" />
-                  </>
-                )}
+                  </>}
               </Button>
             </CardContent>
           </Card>
 
           {/* Results */}
-          {result && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-6"
-            >
+          {result && <motion.div initial={{
+          opacity: 0,
+          y: 20
+        }} animate={{
+          opacity: 1,
+          y: 0
+        }} className="space-y-6">
               {/* BMI & Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card>
@@ -294,9 +267,9 @@ export default function FitnessAgent() {
                       <div className="text-2xl font-bold text-foreground">{result.carbsTarget}g</div>
                       <div className="text-sm text-muted-foreground">Carbs</div>
                     </div>
-                    <div className="text-center p-4 rounded-lg bg-health-warning-light">
+                    <div className="text-center p-4 rounded-lg bg-health-warning-light bg-muted-foreground">
                       <div className="text-2xl font-bold text-foreground">{result.fatTarget}g</div>
-                      <div className="text-sm text-muted-foreground">Fat</div>
+                      <div className="text-sm bg-muted-foreground text-primary-foreground">Fat</div>
                     </div>
                   </div>
                 </CardContent>
@@ -304,8 +277,7 @@ export default function FitnessAgent() {
 
               {/* Workout Plan */}
               <Card className={!isPro ? "relative overflow-hidden" : ""}>
-                {!isPro && (
-                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                {!isPro && <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
                     <div className="text-center p-6">
                       <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Pro Feature</h3>
@@ -319,8 +291,7 @@ export default function FitnessAgent() {
                         </Button>
                       </Link>
                     </div>
-                  </div>
-                )}
+                  </div>}
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Dumbbell className="w-5 h-5 text-health-emerald" />
@@ -329,22 +300,19 @@ export default function FitnessAgent() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-3">
-                    {result.workoutPlan?.map((item, i) => (
-                      <li key={i} className="flex items-start gap-3">
+                    {result.workoutPlan?.map((item, i) => <li key={i} className="flex items-start gap-3">
                         <div className="w-6 h-6 rounded-full bg-health-emerald/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <span className="text-xs font-medium text-health-emerald">{i + 1}</span>
                         </div>
                         <span className="text-foreground">{item}</span>
-                      </li>
-                    ))}
+                      </li>)}
                   </ul>
                 </CardContent>
               </Card>
 
               {/* Meal Suggestions */}
               <Card className={!isPro ? "relative overflow-hidden" : ""}>
-                {!isPro && (
-                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
+                {!isPro && <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex items-center justify-center">
                     <div className="text-center p-6">
                       <Lock className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Pro Feature</h3>
@@ -358,8 +326,7 @@ export default function FitnessAgent() {
                         </Button>
                       </Link>
                     </div>
-                  </div>
-                )}
+                  </div>}
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Utensils className="w-5 h-5 text-health-warning" />
@@ -368,21 +335,18 @@ export default function FitnessAgent() {
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-3">
-                    {result.mealSuggestions?.map((item, i) => (
-                      <li key={i} className="flex items-start gap-3">
+                    {result.mealSuggestions?.map((item, i) => <li key={i} className="flex items-start gap-3">
                         <div className="w-6 h-6 rounded-full bg-health-warning/10 flex items-center justify-center flex-shrink-0 mt-0.5">
                           <span className="text-xs font-medium text-health-warning">{i + 1}</span>
                         </div>
                         <span className="text-foreground">{item}</span>
-                      </li>
-                    ))}
+                      </li>)}
                   </ul>
                 </CardContent>
               </Card>
 
               {/* Weekly Schedule */}
-              {result.weeklySchedule && isPro && (
-                <Card>
+              {result.weeklySchedule && isPro && <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Calendar className="w-5 h-5 text-primary" />
@@ -391,20 +355,16 @@ export default function FitnessAgent() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
-                      {Object.entries(result.weeklySchedule).map(([day, workout]) => (
-                        <div key={day} className="p-3 rounded-lg bg-secondary text-center">
+                      {Object.entries(result.weeklySchedule).map(([day, workout]) => <div key={day} className="p-3 rounded-lg bg-secondary text-center">
                           <div className="text-xs font-medium text-muted-foreground capitalize mb-1">{day}</div>
                           <div className="text-sm text-foreground">{workout}</div>
-                        </div>
-                      ))}
+                        </div>)}
                     </div>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
 
               {/* Tips */}
-              {result.tips && isPro && (
-                <Card>
+              {result.tips && isPro && <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Lightbulb className="w-5 h-5 text-health-warning" />
@@ -413,16 +373,13 @@ export default function FitnessAgent() {
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
-                      {result.tips.map((tip, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                      {result.tips.map((tip, i) => <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
                           <span className="text-health-warning">💡</span>
                           {tip}
-                        </li>
-                      ))}
+                        </li>)}
                     </ul>
                   </CardContent>
-                </Card>
-              )}
+                </Card>}
 
               {/* Disclaimer */}
               <div className="p-4 rounded-xl bg-secondary border border-border">
@@ -434,10 +391,8 @@ export default function FitnessAgent() {
                   </p>
                 </div>
               </div>
-            </motion.div>
-          )}
+            </motion.div>}
         </motion.div>
       </div>
-    </PageLayout>
-  );
+    </PageLayout>;
 }
