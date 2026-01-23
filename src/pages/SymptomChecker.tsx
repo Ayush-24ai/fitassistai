@@ -52,11 +52,11 @@ export default function SymptomChecker() {
   const { isAuthenticated, guestUsage, setGuestUsage } = useAuthStore();
   const { user } = useAuth();
   const { saveAnalysis } = useAnalysisHistory();
-  const { places, isLoading: isLoadingPlaces, searchNearbyPlaces } = useNearbyPlaces();
+  const { places, isLoading: isLoadingPlaces, searchNearbyPlaces, isUsingDemoData } = useNearbyPlaces();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Voice input hook
+  // Voice input hook with auto-stop on silence
   const { 
     isListening, 
     isSupported: voiceSupported, 
@@ -66,7 +66,9 @@ export default function SymptomChecker() {
     error: voiceError 
   } = useVoiceInput({
     onResult: (text) => {
-      setSymptoms(prev => prev ? `${prev} ${text}` : text);
+      if (text.trim()) {
+        setSymptoms(prev => prev ? `${prev} ${text}` : text);
+      }
     },
     onError: (error) => {
       toast({
@@ -76,6 +78,7 @@ export default function SymptomChecker() {
       });
     },
     continuous: true,
+    silenceTimeout: 3000, // Auto-stop after 3 seconds of silence
   });
 
   // Update symptoms with interim transcript while listening
@@ -557,8 +560,11 @@ export default function SymptomChecker() {
                             Nearby {result.doctorType}s
                           </CardTitle>
                           <CardDescription>
-                            Found {places.length} facilities near you
-                            {locationError && (
+                            Found {places.length} facilities within 10km
+                            {isUsingDemoData && (
+                              <span className="text-health-warning ml-2">(Demo data)</span>
+                            )}
+                            {locationError && !isUsingDemoData && (
                               <span className="text-health-warning ml-2">(Using approximate location)</span>
                             )}
                           </CardDescription>

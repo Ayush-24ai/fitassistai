@@ -3,19 +3,21 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { useAuth } from './useAuth';
 
-// Sync Pro status from server on every login/load
-// Never trust local cache for Pro status - always verify with server
+// Pro status is ALWAYS fetched from the server - never trust local state
+// This ensures consistent Pro status across all devices
 
 export function useProStatus() {
   const { user } = useAuth();
-  const { isPro, proExpiresAt, setPro, clearProStatus } = useAuthStore();
+  const { isPro, proExpiresAt, setPro, clearProStatus, markProSynced } = useAuthStore();
   const [loading, setLoading] = useState(true);
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
+  const [lastSyncError, setLastSyncError] = useState<string | null>(null);
   const hasFetchedRef = useRef(false);
   const currentUserIdRef = useRef<string | null>(null);
+  const isFetchingRef = useRef(false);
 
-  // Fetch Pro status from server - this is the source of truth
-  const refreshProStatus = useCallback(async (forceRefresh = false) => {
+  // Fetch Pro status from server - this is the ONLY source of truth
+  const refreshProStatus = useCallback(async (forceRefresh = false): Promise<boolean> => {
     const userId = user?.id;
     
     if (!userId) {
@@ -23,18 +25,26 @@ export function useProStatus() {
       clearProStatus();
       setExpirationDate(null);
       setLoading(false);
+      setLastSyncError(null);
       hasFetchedRef.current = false;
       currentUserIdRef.current = null;
-      return;
+      return false;
+    }
+
+    // Prevent concurrent fetches
+    if (isFetchingRef.current && !forceRefresh) {
+      return isPro;
     }
 
     // Skip if we've already fetched for this user (unless forced)
     if (!forceRefresh && hasFetchedRef.current && currentUserIdRef.current === userId) {
       setLoading(false);
-      return;
+      return isPro;
     }
 
+    isFetchingRef.current = true;
     setLoading(true);
+    setLastSyncError(null);
     
     try {
       const { data, error } = await supabase
@@ -45,18 +55,21 @@ export function useProStatus() {
 
       if (error) {
         console.error('Error fetching Pro status from server:', error);
+        setLastSyncError('Failed to sync subscription status');
         setLoading(false);
-        return;
+        isFetchingRef.current = false;
+        return false;
       }
 
       if (data) {
         const now = new Date();
         const expiresAt = data.pro_expires_at ? new Date(data.pro_expires_at) : null;
-        const isProActive = data.is_pro && (!expiresAt || expiresAt > now);
+        const isProActive = data.is_pro === true && (!expiresAt || expiresAt > now);
 
         // Update local state with server data
         setPro(isProActive, expiresAt?.toISOString() || null);
         setExpirationDate(expiresAt);
+        markProSynced();
 
         // If Pro has expired, update the database
         if (data.is_pro && expiresAt && expiresAt <= now) {
@@ -72,17 +85,28 @@ export function useProStatus() {
 
         hasFetchedRef.current = true;
         currentUserIdRef.current = userId;
+        isFetchingRef.current = false;
+        setLoading(false);
+        
+        return isProActive;
       } else {
         // No profile found - ensure Pro is false
         setPro(false, null);
         setExpirationDate(null);
+        hasFetchedRef.current = true;
+        currentUserIdRef.current = userId;
+        isFetchingRef.current = false;
+        setLoading(false);
+        return false;
       }
     } catch (err) {
       console.error('Error in refreshProStatus:', err);
-    } finally {
+      setLastSyncError('Failed to sync subscription status');
+      isFetchingRef.current = false;
       setLoading(false);
+      return false;
     }
-  }, [user?.id, setPro, clearProStatus]);
+  }, [user?.id, isPro, setPro, clearProStatus, markProSynced]);
 
   // Always fetch from server when user changes or on mount
   useEffect(() => {
@@ -117,8 +141,8 @@ export function useProStatus() {
     return () => subscription.unsubscribe();
   }, [refreshProStatus, clearProStatus]);
 
-  // Activate Pro subscription for 30 days
-  const activatePro = useCallback(async () => {
+  // Activate Pro subscription for 30 days - ALWAYS update server first
+  const activatePro = useCallback(async (): Promise<boolean> => {
     if (!user?.id) return false;
 
     const expiresAt = new Date();
@@ -126,6 +150,7 @@ export function useProStatus() {
     const expiresAtISO = expiresAt.toISOString();
 
     try {
+      // Update server FIRST - this is the source of truth
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -139,9 +164,22 @@ export function useProStatus() {
         return false;
       }
 
-      // Update local state immediately after successful server update
+      // Verify the update by re-fetching from server
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('profiles')
+        .select('is_pro, pro_expires_at')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (verifyError || !verifyData?.is_pro) {
+        console.error('Pro activation verification failed');
+        return false;
+      }
+
+      // Only update local state after server confirmation
       setPro(true, expiresAtISO);
       setExpirationDate(expiresAt);
+      markProSynced();
       hasFetchedRef.current = true;
       
       return true;
@@ -149,7 +187,7 @@ export function useProStatus() {
       console.error('Error in activatePro:', err);
       return false;
     }
-  }, [user?.id, setPro]);
+  }, [user?.id, setPro, markProSynced]);
 
   // Get Pro expiration date (always from state, which reflects server)
   const getProExpiration = useCallback(() => {
@@ -161,6 +199,7 @@ export function useProStatus() {
   return {
     isPro,
     loading,
+    lastSyncError,
     activatePro,
     getProExpiration,
     refreshProStatus: () => refreshProStatus(true), // Always force refresh when called manually
