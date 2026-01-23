@@ -1,16 +1,1 @@
-project_id = "jjiqcopisoquwfddchkh"
-
-[functions.symptom-checker]
-verify_jwt = false
-
-[functions.health-report]
-verify_jwt = false
-
-[functions.fitness-agent]
-verify_jwt = false
-
-[functions.food-scanner]
-verify_jwt = false
-
-[functions.report-ocr]
-verify_jwt = false
+project_id = "rlsfgqeppzctlftlbkft"
