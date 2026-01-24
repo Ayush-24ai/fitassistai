@@ -2,12 +2,20 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Activity } from "lucide-react";
+import { Menu, X, Activity, HelpCircle, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-const navLinks = [
+// Public navigation links (shown when NOT authenticated)
+const publicNavLinks = [
   { href: "/#features", label: "Features" },
   { href: "/#faq", label: "FAQ" },
   { href: "/support", label: "Support" },
@@ -18,6 +26,9 @@ export function Header() {
   const { user, signOut, loading } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
+
+  const isAuthenticated = !!user;
+  const isDashboardArea = location.pathname !== "/" && location.pathname !== "/signin" && location.pathname !== "/signup" && location.pathname !== "/forgot-password";
 
   const handleNavClick = (href: string) => {
     setMobileMenuOpen(false);
@@ -44,7 +55,7 @@ export function Header() {
     setMobileMenuOpen(false);
   };
 
-  const isAuthenticated = !!user;
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || user?.email;
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
@@ -61,7 +72,8 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center gap-6">
-          {navLinks.map((link) => (
+          {/* Only show public nav links on non-authenticated pages */}
+          {!isAuthenticated && publicNavLinks.map((link) => (
             <a
               key={link.href}
               href={link.href}
@@ -78,24 +90,41 @@ export function Header() {
           ))}
         </div>
 
-        {/* Auth Buttons */}
+        {/* Auth Buttons / User Menu */}
         <div className="hidden md:flex items-center gap-3">
           <ThemeToggle />
           {loading ? (
             <div className="animate-pulse text-sm text-muted-foreground">Loading...</div>
           ) : isAuthenticated ? (
             <>
-              <span className="text-sm text-muted-foreground">
-                {user?.user_metadata?.display_name || user?.email?.split('@')[0] || user?.email}
-              </span>
-              <Button variant="ghost" size="sm" onClick={handleSignOut}>
-                Sign Out
-              </Button>
               <Link to="/dashboard">
-                <Button variant="hero" size="sm">
+                <Button variant="ghost" size="sm">
                   Dashboard
                 </Button>
               </Link>
+              
+              {/* User Dropdown Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <User className="w-4 h-4" />
+                    <span className="max-w-[120px] truncate">{displayName}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link to="/support" className="flex items-center gap-2 cursor-pointer">
+                      <HelpCircle className="w-4 h-4" />
+                      Support
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive">
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           ) : (
             <>
@@ -133,7 +162,8 @@ export function Header() {
             className="md:hidden bg-background border-b border-border"
           >
             <div className="container mx-auto px-4 py-4 flex flex-col gap-4">
-              {navLinks.map((link) => (
+              {/* Public nav links only for non-authenticated users */}
+              {!isAuthenticated && publicNavLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
@@ -148,6 +178,7 @@ export function Header() {
                   {link.label}
                 </a>
               ))}
+              
               <div className="flex flex-col gap-2 pt-4 border-t border-border">
                 {loading ? (
                   <div className="animate-pulse text-sm text-muted-foreground py-2">Loading...</div>
@@ -158,8 +189,15 @@ export function Header() {
                         Dashboard
                       </Button>
                     </Link>
-                    <Button variant="ghost" className="w-full" onClick={handleSignOut}>
-                      Sign Out
+                    <Link to="/support" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="outline" className="w-full">
+                        <HelpCircle className="w-4 h-4 mr-2" />
+                        Support
+                      </Button>
+                    </Link>
+                    <Button variant="ghost" className="w-full justify-start" onClick={handleSignOut}>
+                      <LogOut className="w-4 h-4 mr-2" />
+                      Sign Out ({displayName})
                     </Button>
                   </>
                 ) : (

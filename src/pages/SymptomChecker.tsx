@@ -204,43 +204,21 @@ export default function SymptomChecker() {
   };
 
   const openDirections = (place: { lat: number; lng: number; name: string }) => {
-    // Pro-only feature
+    // Pro-only feature - restrict access
     if (!isPro) {
       toast({
         title: "Pro feature",
-        description: "Directions are available for Pro users.",
+        description: "Directions are available for Pro users only.",
         variant: "destructive",
       });
       return;
     }
 
-    // Open in device's default map app using Google Maps URL (works on all platforms)
-    const destination = `${place.lat},${place.lng}`;
-    const origin = userLocation ? `${userLocation.lat},${userLocation.lng}` : '';
-    const encodedName = encodeURIComponent(place.name);
+    // Use standard Google Maps directions URL format
+    // This opens externally in new tab (desktop) or native map app (mobile)
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
     
-    // Detect platform
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isAndroid = /Android/.test(navigator.userAgent);
-    
-    let mapsUrl: string;
-    
-    if (isIOS) {
-      // Apple Maps URL scheme with fallback to Google Maps web
-      mapsUrl = `https://maps.apple.com/?daddr=${destination}&dirflg=d`;
-    } else if (isAndroid) {
-      // Google Maps intent for Android
-      mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${destination}&destination_place_id=${encodedName}&travelmode=driving`;
-    } else {
-      // Desktop - use Google Maps web
-      if (origin) {
-        mapsUrl = `https://www.google.com/maps/dir/${origin}/${destination}`;
-      } else {
-        mapsUrl = `https://www.google.com/maps/search/?api=1&query=${destination}`;
-      }
-    }
-    
-    // Open in new tab/window - this bypasses iframe restrictions
+    // Open in new tab/window - bypasses iframe restrictions completely
     window.open(mapsUrl, '_blank', 'noopener,noreferrer');
   };
 
