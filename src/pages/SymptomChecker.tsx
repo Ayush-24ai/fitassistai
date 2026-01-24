@@ -203,23 +203,9 @@ export default function SymptomChecker() {
     );
   };
 
-  const openDirections = (place: { lat: number; lng: number; name: string }) => {
-    // Pro-only feature - restrict access
-    if (!isPro) {
-      toast({
-        title: "Pro feature",
-        description: "Directions are available for Pro users only.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Use standard Google Maps directions URL format
-    // This opens externally in new tab (desktop) or native map app (mobile)
-    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
-    
-    // Open in new tab/window - bypasses iframe restrictions completely
-    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+  // Generate Google Maps directions URL for a place
+  const getDirectionsUrl = (place: { lat: number; lng: number }) => {
+    return `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}`;
   };
 
   const getSeverityColor = (severity: string) => {
@@ -649,15 +635,15 @@ export default function SymptomChecker() {
                                       )}
                                     </div>
                                   </div>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openDirections(place)}
-                                    className="flex-shrink-0"
+                                  <a
+                                    href={getDirectionsUrl(place)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 flex-shrink-0"
                                   >
                                     <ExternalLink className="w-4 h-4 mr-1" />
                                     Directions
-                                  </Button>
+                                  </a>
                                 </div>
                               </div>
                             ))}
