@@ -142,39 +142,56 @@ export function useProStatus() {
   }, [refreshProStatus, clearProStatus]);
 
   // Activate Pro subscription for 30 days - ALWAYS update server first
+  // Uses UPSERT to handle cases where profile doesn't exist yet
   const activatePro = useCallback(async (): Promise<boolean> => {
-    if (!user?.id) return false;
+    if (!user?.id) {
+      console.error('activatePro: No user ID available');
+      return false;
+    }
 
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
     const expiresAtISO = expiresAt.toISOString();
 
     try {
-      // Update server FIRST - this is the source of truth
-      const { error } = await supabase
+      console.log('Activating Pro for user:', user.id);
+      
+      // Use UPSERT to create or update the profile
+      // This handles both new users (no profile) and existing users
+      const { error: upsertError } = await supabase
         .from('profiles')
-        .update({ 
+        .upsert({ 
+          user_id: user.id,
           is_pro: true, 
-          pro_expires_at: expiresAtISO 
-        })
-        .eq('user_id', user.id);
+          pro_expires_at: expiresAtISO,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
 
-      if (error) {
-        console.error('Error activating Pro:', error);
+      if (upsertError) {
+        console.error('Error upserting Pro status:', upsertError);
         return false;
       }
 
-      // Verify the update by re-fetching from server
+      // Verify the upsert by re-fetching from server
       const { data: verifyData, error: verifyError } = await supabase
         .from('profiles')
         .select('is_pro, pro_expires_at')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (verifyError || !verifyData?.is_pro) {
-        console.error('Pro activation verification failed');
+      if (verifyError) {
+        console.error('Pro activation verification error:', verifyError);
         return false;
       }
+
+      if (!verifyData?.is_pro) {
+        console.error('Pro activation verification failed - is_pro not set');
+        return false;
+      }
+
+      console.log('Pro activation verified successfully:', verifyData);
 
       // Only update local state after server confirmation
       setPro(true, expiresAtISO);
