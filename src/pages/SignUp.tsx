@@ -5,35 +5,23 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
-import { Activity, ArrowLeft, Eye, EyeOff, Mail, Lock, User, CheckCircle, Loader2 } from "lucide-react";
+import { Activity, ArrowLeft, Mail, CheckCircle, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
-type SignUpStep = "email" | "otp" | "password" | "success";
-
 const emailSchema = z.object({
   email: z.string().email("Please enter a valid email address").max(255, "Email must be less than 255 characters"),
 });
 
-const passwordSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
-  password: z.string().min(8, "Password must be at least 8 characters").max(128, "Password must be less than 128 characters"),
-});
-
 export default function SignUp() {
-  const [step, setStep] = useState<SignUpStep>("email");
   const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; name?: string; password?: string }>({});
-  const { signIn, user, loading } = useAuth();
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [errors, setErrors] = useState<{ email?: string }>({});
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -44,7 +32,7 @@ export default function SignUp() {
     }
   }, [user, loading, navigate]);
 
-  const handleSendOtp = async (e: React.FormEvent) => {
+  const handleSendMagicLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
 
@@ -66,156 +54,33 @@ export default function SignUp() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("send-otp", {
-        body: { email, purpose: "signup" },
-      });
-
-      if (error || data?.error) {
-        toast({
-          title: "Error",
-          description: data?.error || error?.message || "Failed to send OTP",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      toast({
-        title: "OTP Sent!",
-        description: "Check your email for the 6-digit verification code.",
-      });
-      setStep("otp");
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to send verification code. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setIsLoading(false);
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otp.length !== 6) {
-      toast({
-        title: "Invalid OTP",
-        description: "Please enter the complete 6-digit code.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("verify-otp", {
-        body: { email, otp, purpose: "signup", verifyOnly: true },
-      });
-
-      if (error || data?.error) {
-        toast({
-          title: "Verification Failed",
-          description: data?.error || error?.message || "Invalid or expired OTP",
-          variant: "destructive",
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      if (data?.verified) {
-        setStep("password");
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to verify OTP. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setIsLoading(false);
-  };
-
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrors({});
-
-    const result = passwordSchema.safeParse({ name, password });
-    if (!result.success) {
-      const fieldErrors: { name?: string; password?: string } = {};
-      result.error.errors.forEach((err) => {
-        if (err.path[0] === "name") fieldErrors.name = err.message;
-        if (err.path[0] === "password") fieldErrors.password = err.message;
-      });
-      setErrors(fieldErrors);
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const { data, error } = await supabase.functions.invoke("verify-otp", {
-        body: { 
-          email, 
-          otp, 
-          purpose: "signup",
-          password,
-          displayName: name,
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/dashboard`,
+          shouldCreateUser: true,
         },
       });
 
-      if (error || data?.error) {
+      if (error) {
         toast({
-          title: "Account Creation Failed",
-          description: data?.error || error?.message || "Failed to create account",
+          title: "Error",
+          description: error.message || "Failed to send magic link",
           variant: "destructive",
         });
         setIsLoading(false);
         return;
       }
 
-      setStep("success");
-      
-      // Auto-login after a short delay
-      setTimeout(async () => {
-        const { error: signInError } = await signIn(email, password);
-        if (!signInError) {
-          navigate("/dashboard");
-        }
-      }, 2000);
+      setMagicLinkSent(true);
+      toast({
+        title: "Magic Link Sent!",
+        description: "Check your email for the sign-in link.",
+      });
     } catch (err) {
       toast({
         title: "Error",
-        description: "Failed to create account. Please try again.",
-        variant: "destructive",
-      });
-    }
-    setIsLoading(false);
-  };
-
-  const handleResendOtp = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("send-otp", {
-        body: { email, purpose: "signup" },
-      });
-
-      if (error || data?.error) {
-        toast({
-          title: "Error",
-          description: data?.error || error?.message || "Failed to resend OTP",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "OTP Resent!",
-          description: "Check your email for the new verification code.",
-        });
-        setOtp("");
-      }
-    } catch (err) {
-      toast({
-        title: "Error",
-        description: "Failed to resend OTP.",
+        description: "Failed to send magic link. Please try again.",
         variant: "destructive",
       });
     }
@@ -250,22 +115,38 @@ export default function SignUp() {
               </span>
             </Link>
             <h1 className="text-2xl font-bold text-foreground mb-2">
-              {step === "email" && "Create Your Account"}
-              {step === "otp" && "Verify Your Email"}
-              {step === "password" && "Set Your Password"}
-              {step === "success" && "Welcome!"}
+              {magicLinkSent ? "Check Your Email" : "Create Your Account"}
             </h1>
             <p className="text-muted-foreground">
-              {step === "email" && "Start your health journey today"}
-              {step === "otp" && `Enter the 6-digit code sent to ${email}`}
-              {step === "password" && "Almost there! Set up your login credentials"}
-              {step === "success" && "Your account has been created successfully"}
+              {magicLinkSent
+                ? `We sent a magic link to ${email}`
+                : "Start your health journey today"}
             </p>
           </div>
 
-          {/* Step 1: Email */}
-          {step === "email" && (
-            <form onSubmit={handleSendOtp} className="space-y-4">
+          {/* Magic Link Sent State */}
+          {magicLinkSent ? (
+            <div className="text-center space-y-6">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+                <CheckCircle className="w-8 h-8 text-primary" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-foreground font-medium">Magic link sent to:</p>
+                <p className="text-muted-foreground">{email}</p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Click the link in your email to sign in. The link will expire in 1 hour.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setMagicLinkSent(false)}
+                className="w-full"
+              >
+                Use a different email
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleSendMagicLink} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <div className="relative">
@@ -314,7 +195,7 @@ export default function SignUp() {
                 {isLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Sending OTP...
+                    Sending Magic Link...
                   </>
                 ) : (
                   "Continue with Email"
@@ -323,158 +204,8 @@ export default function SignUp() {
             </form>
           )}
 
-          {/* Step 2: OTP Verification */}
-          {step === "otp" && (
-            <div className="space-y-6">
-              <div className="flex justify-center">
-                <InputOTP
-                  value={otp}
-                  onChange={setOtp}
-                  maxLength={6}
-                >
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
-              </div>
-
-              <Button
-                onClick={handleVerifyOtp}
-                variant="hero"
-                size="lg"
-                className="w-full"
-                disabled={isLoading || otp.length !== 6}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Verifying...
-                  </>
-                ) : (
-                  "Verify OTP"
-                )}
-              </Button>
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={handleResendOtp}
-                  disabled={isLoading}
-                  className="text-sm text-primary hover:underline disabled:opacity-50"
-                >
-                  Didn't receive the code? Resend
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setStep("email")}
-                className="flex items-center justify-center gap-2 w-full text-sm text-muted-foreground hover:text-foreground"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Use a different email
-              </button>
-            </div>
-          )}
-
-          {/* Step 3: Set Password */}
-          {step === "password" && (
-            <form onSubmit={handleCreateAccount} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="pl-10"
-                    required
-                  />
-                </div>
-                {errors.name && (
-                  <p className="text-sm text-destructive">{errors.name}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10"
-                    minLength={8}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
-                    ) : (
-                      <Eye className="w-4 h-4" />
-                    )}
-                  </button>
-                </div>
-                {errors.password && (
-                  <p className="text-sm text-destructive">{errors.password}</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Must be at least 8 characters
-                </p>
-              </div>
-
-              <Button
-                type="submit"
-                variant="hero"
-                size="lg"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating Account...
-                  </>
-                ) : (
-                  "Create Account"
-                )}
-              </Button>
-            </form>
-          )}
-
-          {/* Step 4: Success */}
-          {step === "success" && (
-            <div className="text-center space-y-6">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <CheckCircle className="w-8 h-8 text-primary" />
-              </div>
-              <div className="space-y-2">
-                <p className="text-foreground font-medium">Account created for:</p>
-                <p className="text-muted-foreground">{email}</p>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Redirecting you to the dashboard...
-              </p>
-            </div>
-          )}
-
           {/* Footer */}
-          {step === "email" && (
+          {!magicLinkSent && (
             <>
               <div className="mt-6 text-center">
                 <p className="text-sm text-muted-foreground">

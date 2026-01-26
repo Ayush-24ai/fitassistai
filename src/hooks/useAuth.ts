@@ -7,12 +7,34 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileComplete, setProfileComplete] = useState(false);
   const { setUser: setStoreUser, setAuthenticated, logout: storeLogout } = useAuthStore();
+
+  const checkProfileCompletion = async (userId: string): Promise<boolean> => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking profile:', error);
+        return false;
+      }
+
+      // Profile is complete if display_name is set
+      return !!(profile?.display_name);
+    } catch (err) {
+      console.error('Profile check error:', err);
+      return false;
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -23,8 +45,13 @@ export function useAuth() {
             name: session.user.user_metadata?.display_name ?? session.user.email?.split('@')[0] ?? '',
           });
           setAuthenticated(true);
+          
+          // Check profile completion
+          const isComplete = await checkProfileCompletion(session.user.id);
+          setProfileComplete(isComplete);
         } else {
           storeLogout();
+          setProfileComplete(false);
         }
         
         setLoading(false);
@@ -32,7 +59,7 @@ export function useAuth() {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -43,6 +70,10 @@ export function useAuth() {
           name: session.user.user_metadata?.display_name ?? session.user.email?.split('@')[0] ?? '',
         });
         setAuthenticated(true);
+        
+        // Check profile completion
+        const isComplete = await checkProfileCompletion(session.user.id);
+        setProfileComplete(isComplete);
       }
       
       setLoading(false);
@@ -81,16 +112,26 @@ export function useAuth() {
     const { error } = await supabase.auth.signOut();
     if (!error) {
       storeLogout();
+      setProfileComplete(false);
     }
     return { error };
+  };
+
+  const refreshProfileStatus = async () => {
+    if (user) {
+      const isComplete = await checkProfileCompletion(user.id);
+      setProfileComplete(isComplete);
+    }
   };
 
   return {
     user,
     session,
     loading,
+    profileComplete,
     signUp,
     signIn,
     signOut,
+    refreshProfileStatus,
   };
 }
