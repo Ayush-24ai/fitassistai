@@ -59,18 +59,22 @@ const quickActions = [
 ];
 
 export default function Dashboard() {
-  const { user, signOut, loading } = useAuth();
+  const { user, signOut, loading, profileComplete } = useAuth();
   const { isPro } = useProStatus();
   const { history, loading: historyLoading, deleteAnalysis, getStats } = useAnalysisHistory();
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Redirect if not authenticated
+  // Redirect based on auth and profile status
   useEffect(() => {
-    if (!loading && !user) {
-      navigate("/signin");
+    if (!loading) {
+      if (!user) {
+        navigate("/signin");
+      } else if (!profileComplete) {
+        navigate("/setup-profile");
+      }
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, profileComplete, navigate]);
 
   const handleLogout = async () => {
     const { error } = await signOut();
