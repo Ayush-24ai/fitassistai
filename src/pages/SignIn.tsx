@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Activity, ArrowLeft, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { z } from "zod";
 
 const signInSchema = z.object({
@@ -115,6 +116,23 @@ export default function SignIn() {
             <p className="text-muted-foreground">
               Sign in to continue your health journey
             </p>
+          </div>
+
+          {/* Google Sign In - Above the form */}
+          <div className="mb-6">
+            <GoogleSignInButton disabled={isLoading} />
+          </div>
+
+          {/* Divider */}
+          <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 text-muted-foreground">
+                Or continue with email
+              </span>
+            </div>
           </div>
 
           {/* Form */}
