@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
@@ -7,7 +7,11 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const { setUser: setStoreUser, setAuthenticated, logout: storeLogout } = useAuthStore();
+  
+  // Use selectors to avoid destructuring issues with hydration
+  const setStoreUser = useAuthStore((state) => state.setUser);
+  const setAuthenticated = useAuthStore((state) => state.setAuthenticated);
+  const storeLogout = useAuthStore((state) => state.logout);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -51,7 +55,7 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, [setStoreUser, setAuthenticated, storeLogout]);
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
     const { data, error } = await supabase.auth.signUp({
@@ -66,24 +70,24 @@ export function useAuth() {
     });
     
     return { data, error };
-  };
+  }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     
     return { data, error };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     const { error } = await supabase.auth.signOut();
     if (!error) {
       storeLogout();
     }
     return { error };
-  };
+  }, [storeLogout]);
 
   return {
     user,
