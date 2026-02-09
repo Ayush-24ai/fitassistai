@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { lovable } from "@/integrations/lovable/index";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
@@ -14,36 +15,69 @@ export function GoogleSignInButton({ disabled }: GoogleSignInButtonProps) {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const isLovableDomain = () => {
+    const hostname = window.location.hostname;
+    return hostname.includes("lovable.app") || hostname.includes("lovableproject.com");
+  };
+
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
 
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
-        extraParams: {
-          prompt: "select_account",
-        },
-      });
-
-      if (result.error) {
-        console.error("Google sign-in error:", result.error);
-        toast({
-          title: "Sign In Failed",
-          description: result.error.message || "Could not sign in with Google. Please try again.",
-          variant: "destructive",
+      if (!isLovableDomain()) {
+        // PWA / custom domain: bypass auth-bridge, use direct Supabase OAuth
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo: `${window.location.origin}/dashboard`,
+            skipBrowserRedirect: true,
+            queryParams: {
+              access_type: "offline",
+              prompt: "select_account",
+            },
+          },
         });
-        setIsLoading(false);
-        return;
-      }
 
-      if (!result.redirected) {
-        navigate("/dashboard");
+        if (error) throw error;
+
+        if (data?.url) {
+          const oauthUrl = new URL(data.url);
+          const allowedHosts = ["accounts.google.com"];
+          if (!allowedHosts.some((host) => oauthUrl.hostname === host)) {
+            throw new Error("Invalid OAuth redirect URL");
+          }
+          window.location.href = data.url;
+          return;
+        }
+      } else {
+        // Lovable preview: use managed auth-bridge
+        const result = await lovable.auth.signInWithOAuth("google", {
+          redirect_uri: window.location.origin,
+          extraParams: {
+            prompt: "select_account",
+          },
+        });
+
+        if (result.error) {
+          console.error("Google sign-in error:", result.error);
+          toast({
+            title: "Sign In Failed",
+            description: result.error.message || "Could not sign in with Google. Please try again.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        if (!result.redirected) {
+          navigate("/dashboard");
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Google sign-in exception:", err);
       toast({
         title: "Sign In Failed",
-        description: "Could not sign in with Google. Please try again.",
+        description: err?.message || "Could not sign in with Google. Please try again.",
         variant: "destructive",
       });
       setIsLoading(false);
