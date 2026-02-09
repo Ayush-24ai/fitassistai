@@ -44,6 +44,27 @@ export type Database = {
         }
         Relationships: []
       }
+      api_rate_limits: {
+        Row: {
+          endpoint: string
+          id: string
+          requested_at: string
+          user_id: string
+        }
+        Insert: {
+          endpoint: string
+          id?: string
+          requested_at?: string
+          user_id: string
+        }
+        Update: {
+          endpoint?: string
+          id?: string
+          requested_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       otp_tokens: {
         Row: {
           attempts: number
@@ -119,6 +140,7 @@ export type Database = {
     }
     Functions: {
       cleanup_old_analyses: { Args: never; Returns: undefined }
+      cleanup_rate_limits: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
