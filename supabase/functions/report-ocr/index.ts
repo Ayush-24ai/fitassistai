@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const RATE_LIMIT = 10; // max requests per hour
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+
+async function checkRateLimit(serviceClient: any, userId: string, endpoint: string): Promise<boolean> {
+  const windowStart = new Date(Date.now() - RATE_WINDOW_MS).toISOString();
+  const { count } = await serviceClient
+    .from('api_rate_limits')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('endpoint', endpoint)
+    .gte('requested_at', windowStart);
+  return (count ?? 0) < RATE_LIMIT;
+}
+
+async function recordRequest(serviceClient: any, userId: string, endpoint: string) {
+  await serviceClient.from('api_rate_limits').insert({ user_id: userId, endpoint });
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -24,10 +42,12 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } }
     });
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Verify user token
     const token = authHeader.replace('Bearer ', '');
@@ -41,6 +61,15 @@ serve(async (req) => {
     }
 
     const userId = claimsData.user.id;
+
+    // Rate limiting
+    if (!await checkRateLimit(serviceClient, userId, 'report-ocr')) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    await recordRequest(serviceClient, userId, 'report-ocr');
 
     const { image } = await req.json();
 
