@@ -49,11 +49,34 @@ serve(async (req) => {
 
     const { labValues }: { labValues: LabValue[] } = await req.json();
     
-    if (!labValues || labValues.length === 0) {
+    if (!labValues || !Array.isArray(labValues) || labValues.length === 0) {
       return new Response(
         JSON.stringify({ error: "Please provide lab values to analyze" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (labValues.length > 50) {
+      return new Response(
+        JSON.stringify({ error: "Too many lab values. Please limit to 50." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate each lab value
+    for (const lv of labValues) {
+      if (!lv.name || typeof lv.name !== 'string' || lv.name.length > 200) {
+        return new Response(
+          JSON.stringify({ error: "Invalid lab value name." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (typeof lv.value !== 'number' || !isFinite(lv.value)) {
+        return new Response(
+          JSON.stringify({ error: `Invalid value for ${lv.name}.` }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");

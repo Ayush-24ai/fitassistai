@@ -59,6 +59,38 @@ serve(async (req) => {
       );
     }
 
+    // Input validation: numeric ranges
+    if (typeof profile.age !== 'number' || profile.age < 1 || profile.age > 150) {
+      return new Response(
+        JSON.stringify({ error: "Invalid age. Must be between 1 and 150." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (typeof profile.height !== 'number' || profile.height < 30 || profile.height > 300) {
+      return new Response(
+        JSON.stringify({ error: "Invalid height. Must be between 30 and 300 cm." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (typeof profile.weight !== 'number' || profile.weight < 10 || profile.weight > 500) {
+      return new Response(
+        JSON.stringify({ error: "Invalid weight. Must be between 10 and 500 kg." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (profile.gender && typeof profile.gender !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Invalid gender value." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    if (profile.goal && (typeof profile.goal !== 'string' || profile.goal.length > 200)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid goal. Must be under 200 characters." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");

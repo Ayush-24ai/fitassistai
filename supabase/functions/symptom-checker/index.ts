@@ -43,9 +43,25 @@ serve(async (req) => {
 
     const { symptoms } = await req.json();
     
-    if (!symptoms || symptoms.trim().length === 0) {
+    if (!symptoms || typeof symptoms !== 'string') {
+      return new Response(
+        JSON.stringify({ error: "Invalid input" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const trimmedSymptoms = symptoms.trim();
+
+    if (trimmedSymptoms.length === 0) {
       return new Response(
         JSON.stringify({ error: "Please provide symptoms to analyze" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (trimmedSymptoms.length > 2000) {
+      return new Response(
+        JSON.stringify({ error: "Symptoms description too long. Please limit to 2000 characters." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -87,7 +103,7 @@ For emergencies, doctorType should be "Emergency Room / Call 911".`;
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Analyze these symptoms and provide guidance: ${symptoms}` },
+          { role: "user", content: `Analyze these symptoms and provide guidance: ${trimmedSymptoms}` },
         ],
         response_format: { type: "json_object" },
       }),
