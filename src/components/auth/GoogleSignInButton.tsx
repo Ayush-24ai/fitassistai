@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable/index";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
 
 interface GoogleSignInButtonProps {
   disabled?: boolean;
@@ -11,32 +12,33 @@ interface GoogleSignInButtonProps {
 export function GoogleSignInButton({ disabled }: GoogleSignInButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-          queryParams: {
-            access_type: "offline",
-            prompt: "select_account",
-          },
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+        extraParams: {
+          prompt: "select_account",
         },
       });
 
-      if (error) {
-        console.error("Google sign-in error:", error);
+      if (result.error) {
+        console.error("Google sign-in error:", result.error);
         toast({
           title: "Sign In Failed",
-          description: error.message || "Could not sign in with Google. Please try again.",
+          description: result.error.message || "Could not sign in with Google. Please try again.",
           variant: "destructive",
         });
         setIsLoading(false);
+        return;
       }
-      // Note: If successful, the page will redirect, so we don't need to handle success here
+
+      if (!result.redirected) {
+        navigate("/dashboard");
+      }
     } catch (err) {
       console.error("Google sign-in exception:", err);
       toast({
