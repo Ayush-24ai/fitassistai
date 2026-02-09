@@ -44,9 +44,17 @@ serve(async (req) => {
 
     const { image } = await req.json();
 
-    if (!image) {
+    if (!image || typeof image !== 'string') {
       return new Response(
         JSON.stringify({ error: 'No image provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Limit image payload size (~10MB base64)
+    if (image.length > 10 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: 'Image too large. Please use an image under 10MB.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
